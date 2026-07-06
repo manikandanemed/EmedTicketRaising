@@ -22,34 +22,27 @@ import { api, WorkItemDto, BugDto, API_BASE_URL } from '../services/api';
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isPM = user?.userType === 'ProductManager';
 
   const [tasks, setTasks] = useState<WorkItemDto[]>([]);
   const [tasksTotalCount, setTasksTotalCount] = useState(0);
   const [tasksTotalPages, setTasksTotalPages] = useState(1);
-  const [bugs, setBugs] = useState<BugDto[]>([]);
-  const [bugsTotalCount, setBugsTotalCount] = useState(0);
-  const [bugsTotalPages, setBugsTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(false);
-  const [bugsLoading, setBugsLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  const [activeTab, setActiveTab] = useState<'tasks' | 'bugs'>('tasks');
+  const [bugs, setBugs] = useState<BugDto[]>([]);
+  const [involvedTasks, setInvolvedTasks] = useState<WorkItemDto[]>([]);
 
   // Task-specific filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [workTypeFilter, setWorkTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
-
-  // Bug-specific filters
-  const [bugSearchQuery, setBugSearchQuery] = useState('');
-  const [bugStatusFilter, setBugStatusFilter] = useState('all');
-  const [bugDateFilter, setBugDateFilter] = useState('');
 
   // Pagination State
   const [taskPage, setTaskPage] = useState(1);
-  const [bugPage, setBugPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   const [projects, setProjects] = useState<any[]>([]);
@@ -77,13 +70,19 @@ export default function EmployeeDashboard() {
 
   const [workTitleError, setWorkTitleError] = useState('');
   const [projectSelectError, setProjectSelectError] = useState('');
+  
+  // Epic & Bug extra fields
+  const [bugSeverity, setBugSeverity] = useState('3');
+  const [bugIssueType, setBugIssueType] = useState('New');
+  const [newEpicName, setNewEpicName] = useState('');
+  const [newEpicColor, setNewEpicColor] = useState('purple');
+  const [submissionType, setSubmissionType] = useState<'standard' | 'another' | 'copy'>('standard');
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tasksRes, bugsRes, projectsRes, employeesRes] = await Promise.all([
+      const [tasksRes, projectsRes, employeesRes] = await Promise.all([
         api.getMyWorkItemsPaged({ page: 1, pageSize: ITEMS_PER_PAGE }),
-        api.getMyBugsPaged({ page: 1, pageSize: ITEMS_PER_PAGE }),
         api.getAllProjects(),
         api.getEmployeesDropdown()
       ]);
@@ -93,13 +92,14 @@ export default function EmployeeDashboard() {
         setTasksTotalCount(tasksRes.data.totalCount);
         setTasksTotalPages(tasksRes.data.totalPages);
       }
-      if (bugsRes.success) {
-        setBugs(bugsRes.data.items);
-        setBugsTotalCount(bugsRes.data.totalCount);
-        setBugsTotalPages(bugsRes.data.totalPages);
-      }
       if (projectsRes.success) setProjects(projectsRes.data);
       if (employeesRes.success) setEmployees(employeesRes.data);
+
+      // Load previously involved tasks (reassigned away)
+      try {
+        const involvedRes = await api.getInvolvedWorkItems();
+        if (involvedRes.success) setInvolvedTasks(involvedRes.data);
+      } catch (_) {}
     } catch (err: any) {
       setError(err.message || 'Failed to fetch employee tasks');
     } finally {
@@ -152,11 +152,15 @@ export default function EmployeeDashboard() {
         workType: functionalWorkType,
         startDate: functionalStartDate || null,
         dueDate: functionalDueDate || null,
-        parentId: functionalParentId === '' ? null : Number(functionalParentId),
+        parentId: functionalWorkType === 'Epic' ? null : (functionalParentId === '' ? null : Number(functionalParentId)),
         labels: functionalLabel || null,
         team: functionalTeam || null,
         attachmentUrls: uploadedAttachmentUrls.join(',') || null,
-        assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId)
+        assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId),
+        epicName: functionalWorkType === 'Epic' ? newEpicName || newWorkTitle : null,
+        epicColor: functionalWorkType === 'Epic' ? newEpicColor : null,
+        severity: functionalWorkType === 'Bug' ? bugSeverity : null,
+        issueType: functionalWorkType === 'Bug' ? bugIssueType : null
       });
 
       if (res.success) {
@@ -165,11 +169,14 @@ export default function EmployeeDashboard() {
         // Refresh data
         fetchData();
 
-        if (createAnother) {
+        if (submissionType === 'another' || createAnother) {
           setNewWorkTitle('');
           setNewWorkDesc('');
           setUploadedAttachmentUrls([]);
           setWorkTitleError('');
+        } else if (submissionType === 'copy') {
+          // Keep all form state intact so they can create a copy immediately
+          toast.info('Form values kept. You can now modify and create a copy.');
         } else {
           setShowCreateFunctional(false);
           setNewWorkTitle('');
@@ -182,6 +189,10 @@ export default function EmployeeDashboard() {
           setFunctionalLabel('');
           setFunctionalTeam('');
           setUploadedAttachmentUrls([]);
+          setBugSeverity('3');
+          setBugIssueType('New');
+          setNewEpicName('');
+          setNewEpicColor('purple');
         }
       }
     } catch (err: any) {
@@ -235,7 +246,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleExportCSV = () => {
-    if (tasks.length === 0 && bugs.length === 0) {
+    if (tasks.length === 0) {
       toast.info('No data found to export.');
       return;
     }
@@ -252,23 +263,18 @@ export default function EmployeeDashboard() {
       'Project Code',
       'Assigned To',
       'Raised By / Created By',
-      'Linked Task Number',
-      'Linked Task Title',
       'Created On',
-      'Due Date',
-      'Fixed On',
-      'Closed On'
+      'Due Date'
     ];
 
     const q = (val: any) => `"${safeStr(val).replace(/"/g, '""')}"`;
 
     const rows: string[] = [headers.join(',')];
 
-    // For each task, add task row then any bugs linked to that task
+    // For each work item, add a row
     tasks.forEach(t => {
-      // Task row
       rows.push([
-        q('Task'),
+        q(t.workType || 'Task'),
         q(t.workNumber),
         q(t.title),
         q(t.description),
@@ -278,65 +284,13 @@ export default function EmployeeDashboard() {
         q(t.projectNumber),
         q(t.assignedTo || user?.name || ''),
         q(t.createdBy),
-        q(''),                          // Linked Task Number (N/A for tasks)
-        q(''),                          // Linked Task Title (N/A for tasks)
         q(new Date(t.createdAt).toLocaleDateString()),
-        q(t.dueDate ? new Date(t.dueDate).toLocaleDateString() : ''),
-        q(''),                          // Fixed On (N/A for tasks)
-        q('')                           // Closed On (N/A for tasks)
-      ].join(','));
-
-      // Bugs linked to this task
-      const linkedBugs = bugs.filter(b => b.workItemId === t.id);
-      linkedBugs.forEach(b => {
-        rows.push([
-          q('Bug'),
-          q(b.bugNumber),
-          q(b.title),
-          q(b.description),
-          q(b.status),
-          q(''),                        // Priority (N/A for bugs)
-          q(t.projectName),
-          q(t.projectNumber),
-          q(b.assignedTo || ''),
-          q(b.raisedBy),
-          q(b.workNumber),
-          q(b.workItemTitle),
-          q(new Date(b.createdAt).toLocaleDateString()),
-          q(''),                        // Due Date (N/A for bugs)
-          q(b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : ''),
-          q(b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '')
-        ].join(','));
-      });
-    });
-
-    // Also add any bugs NOT linked to tasks assigned to this employee
-    // (bugs assigned to this employee on tasks NOT assigned to this employee)
-    const taskIds = new Set(tasks.map(t => t.id));
-    const orphanBugs = bugs.filter(b => !taskIds.has(b.workItemId));
-    orphanBugs.forEach(b => {
-      rows.push([
-        q('Bug'),
-        q(b.bugNumber),
-        q(b.title),
-        q(b.description),
-        q(b.status),
-        q(''),
-        q(''),
-        q(''),
-        q(b.assignedTo || ''),
-        q(b.raisedBy),
-        q(b.workNumber),
-        q(b.workItemTitle),
-        q(new Date(b.createdAt).toLocaleDateString()),
-        q(''),
-        q(b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : ''),
-        q(b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '')
+        q(t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '')
       ].join(','));
     });
 
     const csvContent = rows.join('\n');
-    downloadCSV('my_tasks_and_bugs.csv', csvContent);
+    downloadCSV('my_work_items.csv', csvContent);
   };
 
   useEffect(() => {
@@ -350,9 +304,10 @@ export default function EmployeeDashboard() {
       const res = await api.getMyWorkItemsPaged({
         page: taskPage,
         pageSize: ITEMS_PER_PAGE,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
+        status: statusFilters.length > 0 ? statusFilters.join(',') : undefined,
         dueDate: dateFilter || undefined,
         search: searchQuery || undefined,
+        workType: workTypeFilter !== 'all' ? workTypeFilter : undefined,
       });
       if (res.success) {
         setTasks(res.data.items);
@@ -369,49 +324,14 @@ export default function EmployeeDashboard() {
   // Reset page to 1 when task filters change
   useEffect(() => {
     setTaskPage(1);
-  }, [searchQuery, statusFilter, dateFilter]);
+  }, [searchQuery, statusFilters, dateFilter, workTypeFilter]);
 
   // Re-fetch tasks when page or filters change (but skip initial mount — fetchData handles it)
   const isFirstRender = React.useRef(true);
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     fetchTasks();
-  }, [taskPage, searchQuery, statusFilter, dateFilter]);
-
-  // fetchBugs — server-side bug query
-  const fetchBugs = async () => {
-    setBugsLoading(true);
-    try {
-      const res = await api.getMyBugsPaged({
-        page: bugPage,
-        pageSize: ITEMS_PER_PAGE,
-        status: bugStatusFilter !== 'all' ? bugStatusFilter : undefined,
-        date: bugDateFilter || undefined,
-        search: bugSearchQuery || undefined,
-      });
-      if (res.success) {
-        setBugs(res.data.items);
-        setBugsTotalCount(res.data.totalCount);
-        setBugsTotalPages(res.data.totalPages);
-      }
-    } catch (err: any) {
-      console.error('Failed to fetch bugs:', err);
-    } finally {
-      setBugsLoading(false);
-    }
-  };
-
-  // Reset bug page to 1 when bug filters change
-  useEffect(() => {
-    setBugPage(1);
-  }, [bugSearchQuery, bugStatusFilter, bugDateFilter]);
-
-  // Re-fetch bugs when bug page or filters change
-  const isFirstRenderBugs = React.useRef(true);
-  useEffect(() => {
-    if (isFirstRenderBugs.current) { isFirstRenderBugs.current = false; return; }
-    fetchBugs();
-  }, [bugPage, bugSearchQuery, bugStatusFilter, bugDateFilter]);
+  }, [taskPage, searchQuery, statusFilters, dateFilter, workTypeFilter]);
 
   if (loading) {
     return (
@@ -422,22 +342,16 @@ export default function EmployeeDashboard() {
     );
   }
 
-  // KPI summaries (from loaded tasks slice — still accurate because we load all for overview)
-  const pendingTasks = tasks.filter(t => t.status === 'pending' && t.workType?.toLowerCase() !== 'bug').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'in_progress' && t.workType?.toLowerCase() !== 'bug').length;
-  const testingTasks = tasks.filter(t => t.status === 'testing' && t.workType?.toLowerCase() !== 'bug').length;
-  const completedTasks = tasks.filter(t => (t.status === 'completed' || t.status === 'closed') && t.workType?.toLowerCase() !== 'bug').length;
-  
-  const activeBugs = bugs.filter(b => b.status === 'open' || b.status === 'in_progress').length;
+  // KPI summaries (from loaded tasks slice)
+  const pendingTasks = tasks.filter(t => (t.status === 'pending' || t.status === 'open' || t.status === 'assigned' || t.status === 'reopened') && t.workType?.toLowerCase() !== 'bug').length;
+  const inProgressTasks = tasks.filter(t => (t.status === 'in_progress' || t.status === 'waiting_customer' || t.status === 'future_release' || t.status === 'testing') && t.workType?.toLowerCase() !== 'bug').length;
+  const completedTasks = tasks.filter(t => (t.status === 'completed' || t.status === 'closed' || t.status === 'fixed' || t.status === 'resolved') && t.workType?.toLowerCase() !== 'bug').length;
+  const activeBugs = tasks.filter(t => t.workType?.toLowerCase() === 'bug' && t.status !== 'completed' && t.status !== 'closed' && t.status !== 'fixed' && t.status !== 'resolved').length;
 
   // Tasks are already filtered + paginated by server
-  const filteredTasks = tasks.filter(t => t.workType?.toLowerCase() !== 'bug');
+  const filteredTasks = tasks;
   const paginatedTasks = filteredTasks;
   const totalTaskPages = tasksTotalPages;
-
-  // Bugs are now server-side filtered + paginated
-  const paginatedBugs = bugs;
-  const totalBugPages = bugsTotalPages;
 
   return (
     <div className="page-enter">
@@ -449,7 +363,7 @@ export default function EmployeeDashboard() {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-primary" onClick={() => { setShowCreateFunctional(true); setCreateAnother(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <PlusCircle size={18} />
-            Create Functional Requirement
+            Create
           </button>
           <button className="btn btn-secondary" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Download size={18} />
@@ -463,7 +377,7 @@ export default function EmployeeDashboard() {
 
       {/* Quick Summary Cards */}
       <div className="dashboard-grid">
-        <div className="stat-card glass-panel">
+        <div className="stat-card glass-panel custom-card-highlight">
           <div className="stat-info">
             <h3>Pending Tasks</h3>
             <p>{pendingTasks}</p>
@@ -473,7 +387,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <div className="stat-card glass-panel">
+        <div className="stat-card glass-panel custom-card-highlight">
           <div className="stat-info">
             <h3>In Progress</h3>
             <p style={{ color: 'var(--warning)' }}>{inProgressTasks}</p>
@@ -483,7 +397,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <div className="stat-card glass-panel">
+        <div className="stat-card glass-panel custom-card-highlight">
           <div className="stat-info">
             <h3>Bugs Assigned</h3>
             <p style={{ color: 'var(--danger)' }}>{activeBugs}</p>
@@ -493,7 +407,7 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <div className="stat-card glass-panel">
+        <div className="stat-card glass-panel custom-card-highlight">
           <div className="stat-info">
             <h3>Completed</h3>
             <p style={{ color: 'var(--success)' }}>{completedTasks}</p>
@@ -517,23 +431,128 @@ export default function EmployeeDashboard() {
             style={{ paddingLeft: '42px' }}
           />
         </div>
-        <select
-          className="form-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ width: '180px' }}
-        >
-          <option value="all">All Statuses</option>
-          <option value="pending">TO DO</option>
-          <option value="assigned">ASSIGNED</option>
-          <option value="reopened">REOPEN</option>
-          <option value="in_progress">IN PROGRESS</option>
-          <option value="waiting_customer">WAITING FOR CUSTOMER</option>
-          <option value="future_release">MOVED TO FUTURE RELEASE</option>
-          <option value="completed">RESOLVED</option>
-          <option value="open">Open (Bugs)</option>
-          <option value="fixed">Fixed (Bugs)</option>
-        </select>
+        {/* Checkbox Multi-Select Status Dropdown */}
+        <div style={{ position: 'relative', width: '180px' }}>
+          <button
+            type="button"
+            className="form-select"
+            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            style={{
+              width: '180px',
+              textAlign: 'left',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border-soft)',
+              borderRadius: 'var(--radius-md)',
+              height: '42px',
+              padding: '0 30px 0 16px',
+              fontSize: '0.95rem',
+              cursor: 'pointer'
+            }}
+          >
+            {statusFilters.length === 0 
+              ? 'All Statuses' 
+              : `${statusFilters.length} Selected`}
+          </button>
+
+          {statusDropdownOpen && (
+            <>
+              <div 
+                onClick={() => setStatusDropdownOpen(false)} 
+                style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+              />
+              <div 
+                className="glass-panel" 
+                style={{
+                  position: 'absolute',
+                  top: '46px',
+                  left: 0,
+                  right: 0,
+                  zIndex: 999,
+                  background: '#FFFFFF',
+                  border: '1px solid var(--border-soft)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxHeight: '260px',
+                  overflowY: 'auto'
+                }}
+              >
+                {[
+                  { id: 'pending', label: 'TO DO' },
+                  { id: 'assigned', label: 'ASSIGNED' },
+                  { id: 'reopened', label: 'REOPEN' },
+                  { id: 'in_progress', label: 'IN PROGRESS' },
+                  { id: 'future_release', label: 'MOVED TO FUTURE' },
+                  { id: 'completed', label: 'RESOLVED' },
+                  { id: 'open', label: 'Open' },
+                  { id: 'fixed', label: 'Fixed' }
+                ].map((item) => {
+                  const checked = statusFilters.includes(item.id);
+                  return (
+                    <label 
+                      key={item.id} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        color: 'var(--text-primary)',
+                        padding: '4px 6px',
+                        borderRadius: '4px',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-glow)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          if (checked) {
+                            setStatusFilters(prev => prev.filter(x => x !== item.id));
+                          } else {
+                            setStatusFilters(prev => [...prev, item.id]);
+                          }
+                        }}
+                        style={{
+                          accentColor: 'var(--primary)',
+                          width: '15px',
+                          height: '15px',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  );
+                })}
+                <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setStatusFilters([])}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Clear All
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setStatusDropdownOpen(false)}
+                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         <select
           className="form-select"
           value={priorityFilter}
@@ -545,6 +564,20 @@ export default function EmployeeDashboard() {
           <option value="medium">Medium</option>
           <option value="high">High</option>
           <option value="critical">Critical</option>
+        </select>
+
+        <select
+          className="form-select"
+          value={workTypeFilter}
+          onChange={(e) => setWorkTypeFilter(e.target.value)}
+          style={{ width: '180px' }}
+        >
+          <option value="all">All Work Types</option>
+          <option value="Task">Tasks</option>
+          <option value="Bug">Bugs</option>
+          <option value="Epic">Epics</option>
+          <option value="Functional Requirements">Functional Requirements</option>
+          <option value="Design Update">Design Updates</option>
         </select>
 
         {/* Date Filter */}
@@ -587,17 +620,12 @@ export default function EmployeeDashboard() {
           My Work Items
         </span>
         <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
-          {filteredTasks.length} tasks
+          {tasksTotalCount} items
         </span>
-        {bugsTotalCount > 0 && (
-          <span style={{ background: 'rgba(244,63,94,0.15)', color: '#f43f5e', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
-            {bugsTotalCount} bugs
-          </span>
-        )}
       </div>
 
       {/* UNIFIED QUEUE: JIRA-Style Tables */}
-      {filteredTasks.length === 0 && bugs.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon"><CheckSquare size={28} /></div>
           <h3>No work items found.</h3>
@@ -609,13 +637,14 @@ export default function EmployeeDashboard() {
           {/* TASKS TABLE */}
           {filteredTasks.length > 0 && (
             <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Tasks Queue</h3>
+              <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Work Items Queue</h3>
               <div className="table-container">
                 <table className="custom-table">
                   <thead>
                     <tr>
                       <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                       <th>Work</th>
+                      <th>Project</th>
                       <th>Assignee</th>
                       <th>Reporter</th>
                       <th>Priority</th>
@@ -653,6 +682,11 @@ export default function EmployeeDashboard() {
                               </span>
                             </div>
                           </td>
+                          <td>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              {item.projectName || '—'}
+                            </span>
+                          </td>
                           <td>{renderUserAvatarAndName(user?.name)}</td>
                           <td>{renderUserAvatarAndName(item.createdBy)}</td>
                           <td>
@@ -679,7 +713,6 @@ export default function EmployeeDashboard() {
                               <option value="assigned">ASSIGNED</option>
                               <option value="reopened">REOPEN</option>
                               <option value="in_progress">IN PROGRESS</option>
-                              <option value="waiting_customer">WAITING FOR CUSTOMER</option>
                               <option value="future_release">MOVED TO FUTURE RELEASE</option>
                               <option value="fixed">FIXED</option>
                               <option value="completed">RESOLVED</option>
@@ -731,168 +764,108 @@ export default function EmployeeDashboard() {
             </div>
           )}
 
-          {/* BUGS TABLE */}
-          {bugsTotalCount > 0 && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              {/* Bug-specific filter bar */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginRight: '8px', whiteSpace: 'nowrap' }}>Bugs Queue</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
-                  <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Search bugs by title or BUG-001..."
-                    value={bugSearchQuery}
-                    onChange={(e) => setBugSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '12px', height: '36px', fontSize: '0.85rem' }}
-                  />
-                </div>
-                <select
-                  className="form-select"
-                  value={bugStatusFilter}
-                  onChange={(e) => setBugStatusFilter(e.target.value)}
-                  style={{ width: '160px', height: '36px', paddingTop: 0, paddingBottom: 0, paddingRight: '30px', paddingLeft: '12px', fontSize: '0.85rem' }}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="fixed">Fixed</option>
-                  <option value="closed">Closed</option>
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={bugDateFilter}
-                    onChange={(e) => setBugDateFilter(e.target.value)}
-                    style={{ width: '145px', height: '36px', cursor: 'pointer', padding: '0 8px', fontSize: '0.85rem' }}
-                  />
-                  {bugDateFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setBugDateFilter('')}
-                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {bugsLoading && <Loader2 size={16} className="spinner" style={{ color: 'var(--primary)' }} />}
-              </div>
-              <div className="table-container">
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
-                      <th>Work</th>
-                      <th>Assignee</th>
-                      <th>Reporter</th>
-                      <th>Status</th>
-                      <th>Resolution</th>
-                      <th>Created</th>
-                      <th>Fixed On</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedBugs.map((bug) => {
-                      const isClosed = bug.status === 'closed';
-                      const resolution = isClosed ? 'Resolved' : 'Unresolved';
-                      return (
-                        <tr key={`bug-${bug.id}`}>
-                          <td><input type="checkbox" /></td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Bug size={15} fill="#FCA5A5" color="#EF4444" style={{ flexShrink: 0 }} />
-                              <a
-                                onClick={() => navigate(`/bugs/${bug.id}`)}
-                                style={{
+          {/* BUGS TABLE REMOVED */}
+        </div>
+      )}
+
+      {/* PREVIOUSLY WORKED ON / INVOLVED TASKS */}
+      {involvedTasks.length > 0 && (
+        <div style={{ marginTop: '40px', marginBottom: '30px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <span style={{ fontWeight: 700, fontSize: '1rem' }}>
+              Previously Worked On
+            </span>
+            <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
+              {involvedTasks.length} items
+            </span>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Involved Items Queue</h3>
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
+                    <th>Work</th>
+                    <th>Project</th>
+                    <th>Current Assignee</th>
+                    <th>Reporter</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Resolution</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                    <th>Due Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {involvedTasks.map((item) => {
+                    const isCompleted = item.status === 'completed' || item.status === 'closed';
+                    const resolution = isCompleted ? 'Resolved' : 'Unresolved';
+                    return (
+                      <tr key={`involved-${item.id}`}>
+                        <td><input type="checkbox" /></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {renderWorkTypeIcon(item.workType)}
+                            <a
+                              onClick={() => navigate(`/workitems/${item.id}`)}
+                              style={{
                                   color: 'var(--primary)',
                                   fontWeight: 700,
                                   textDecoration: 'underline',
                                   cursor: 'pointer',
                                   whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {bug.bugNumber}
-                              </a>
-                              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                {bug.title}
-                              </span>
-                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                                (Task: {bug.workNumber})
-                              </span>
-                            </div>
-                          </td>
-                          <td>{renderUserAvatarAndName(bug.assignedTo || user?.name)}</td>
-                          <td>{renderUserAvatarAndName(bug.raisedBy)}</td>
-                          <td>
-                            <select
-                              className="form-select"
-                              value={bug.status}
-                              onChange={(e) => handleUpdateBugStatus(bug.id, e.target.value)}
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '0.82rem',
-                                width: 'auto',
-                                minWidth: '120px',
-                                height: 'auto',
-                                borderRadius: '4px'
                               }}
                             >
-                              <option value="open">OPEN</option>
-                              <option value="in_progress">IN PROGRESS</option>
-                              <option value="fixed">FIXED</option>
-                              <option value="closed">CLOSED</option>
-                            </select>
-                          </td>
-                          <td>
-                            <span style={{
-                              color: isClosed ? '#10B981' : '#6B7280',
-                              fontWeight: 600,
-                              fontSize: '0.85rem'
-                            }}>
-                              {resolution}
+                              {item.workNumber}
+                            </a>
+                            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                              {item.title}
                             </span>
-                          </td>
-                          <td>{new Date(bug.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                          <td>{bug.fixedAt ? new Date(bug.fixedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Controls */}
-              {totalBugPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px', borderTop: '1px solid var(--border-soft)', paddingTop: '16px' }}>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setBugPage(prev => Math.max(prev - 1, 1))}
-                    disabled={bugPage === 1}
-                    style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)' }}
-                  >
-                    Previous
-                  </button>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    Page {bugPage} of {totalBugPages}
-                  </span>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setBugPage(prev => Math.min(prev + 1, totalBugPages))}
-                    disabled={bugPage === totalBugPages}
-                    style={{ padding: '6px 12px', fontSize: '0.82rem', borderRadius: 'var(--radius-sm)' }}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {item.projectName || '—'}
+                          </span>
+                        </td>
+                        <td>{renderUserAvatarAndName(item.assignedTo)}</td>
+                        <td>{renderUserAvatarAndName(item.createdBy)}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {renderPriorityIcon(item.priority)}
+                            <span style={{ textTransform: 'capitalize', fontWeight: 500 }}>{item.priority}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge badge-${item.status}`} style={{ textTransform: 'uppercase', fontSize: '0.72rem', padding: '3px 8px' }}>
+                            {formatWorkItemStatus(item.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            color: isCompleted ? '#10B981' : '#6B7280',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
+                          }}>
+                            {resolution}
+                          </span>
+                        </td>
+                        <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                        <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                        <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-
+          </div>
         </div>
       )}
+
 
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
@@ -902,7 +875,7 @@ export default function EmployeeDashboard() {
               <X size={24} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Functional Requirements</h2>
+            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Work Item</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -943,9 +916,17 @@ export default function EmployeeDashboard() {
                     id="funcWorkType"
                     className="form-select"
                     value={functionalWorkType}
-                    onChange={(e) => setFunctionalWorkType(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFunctionalWorkType(val);
+                      if (val === 'Bug') {
+                        setFunctionalStatus('new');
+                      } else {
+                        setFunctionalStatus('pending');
+                      }
+                    }}
                   >
-                    <option value="Epic">⚡ Epic</option>
+                    {isPM && <option value="Epic">⚡ Epic</option>}
                     <option value="Task">☑️ Task</option>
                     <option value="Functional Requirements">⚡ Functional Requirements</option>
                     <option value="Design Update">⚠️ Design Update</option>
@@ -962,17 +943,42 @@ export default function EmployeeDashboard() {
                     value={functionalStatus}
                     onChange={(e) => setFunctionalStatus(e.target.value)}
                   >
-                    <option value="pending">TO DO</option>
-                    <option value="assigned">ASSIGNED</option>
-                    <option value="reopened">REOPEN</option>
-                    <option value="in_progress">IN PROGRESS</option>
-                    <option value="waiting_customer">WAITING FOR CUSTOMER</option>
-                    <option value="future_release">MOVED TO FUTURE RELEASE</option>
-                    <option value="fixed">FIXED</option>
-                    <option value="completed">RESOLVED</option>
+                    {functionalWorkType === 'Bug' ? (
+                      <>
+                        <option value="new">New</option>
+                        <option value="open">Open</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="pending">TO DO</option>
+                        <option value="assigned">ASSIGNED</option>
+                        <option value="reopened">REOPEN</option>
+                        <option value="in_progress">IN PROGRESS</option>
+                        <option value="future_release">MOVED TO FUTURE RELEASE</option>
+                        <option value="fixed">FIXED</option>
+                        <option value="completed">RESOLVED</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
+
+              {/* Bug Issue Type Row */}
+              {functionalWorkType === 'Bug' && (
+                <div className="form-group">
+                  <label htmlFor="bugIssueType">Issue Type</label>
+                  <select
+                    id="bugIssueType"
+                    className="form-select"
+                    value={bugIssueType}
+                    onChange={(e) => setBugIssueType(e.target.value)}
+                  >
+                    <option value="New">New</option>
+                    <option value="Reopen">Reopen</option>
+                    <option value="Regression">Regression</option>
+                  </select>
+                </div>
+              )}
 
               {/* Summary */}
               <div className="form-group">
@@ -1022,29 +1028,7 @@ export default function EmployeeDashboard() {
               {/* Assignee Selection */}
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="funcAssignee" style={{ marginBottom: 0 }}>Assignee</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (user?.userId) {
-                        setNewWorkAssignedId(user.userId);
-                      } else {
-                        toast.error('No logged-in user session found');
-                      }
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#38bdf8',
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      padding: 0,
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    Assign to me
-                  </button>
+                  <label htmlFor="funcAssignee" style={{ marginBottom: 0 }}>Assign To</label>
                 </div>
                 <select
                   id="funcAssignee"
@@ -1079,75 +1063,136 @@ export default function EmployeeDashboard() {
                   </select>
                 </div>
 
+                {/* Bug → Severity */}
+                {functionalWorkType === 'Bug' && (
+                  <div className="form-group">
+                    <label htmlFor="funcSeverity">Severity</label>
+                    <select
+                      id="funcSeverity"
+                      className="form-select"
+                      value={bugSeverity}
+                      onChange={(e) => setBugSeverity(e.target.value)}
+                    >
+                      <option value="1">1 (Lowest)</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6 (Highest)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Epic → Epic Name & Color */}
+                {functionalWorkType === 'Epic' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="funcEpicName">Epic Name</label>
+                      <input
+                        id="funcEpicName"
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. User Authentication"
+                        value={newEpicName}
+                        onChange={(e) => setNewEpicName(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="funcEpicColor">Epic Color</label>
+                      <select
+                        id="funcEpicColor"
+                        className="form-select"
+                        value={newEpicColor}
+                        onChange={(e) => setNewEpicColor(e.target.value)}
+                      >
+                        <option value="purple">🟣 Purple</option>
+                        <option value="blue">🔵 Blue</option>
+                        <option value="teal">💠 Teal</option>
+                        <option value="green">🟢 Green</option>
+                        <option value="orange">🟠 Orange</option>
+                        <option value="red">🔴 Red</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
                 {/* Parent Selection */}
-                <div className="form-group">
-                  <label htmlFor="funcParent">Parent</label>
-                  <select
-                    id="funcParent"
-                    className="form-select"
-                    value={functionalParentId}
-                    onChange={(e) => setFunctionalParentId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <option value="">Select parent</option>
-                    {(selectedProjectIdForCreation 
-                      ? projects.find(p => p.id === Number(selectedProjectIdForCreation))?.workItems || [] 
-                      : []
-                    ).map((item: any) => (
-                      <option key={item.id} value={item.id}>
-                        {item.workNumber} - {item.title} ({item.workType || 'Task'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {functionalWorkType !== 'Bug' && functionalWorkType !== 'Epic' && (
+                  <div className="form-group">
+                    <label htmlFor="funcParent">Parent</label>
+                    <select
+                      id="funcParent"
+                      className="form-select"
+                      value={functionalParentId}
+                      onChange={(e) => setFunctionalParentId(e.target.value === '' ? '' : Number(e.target.value))}
+                    >
+                      <option value="">Select parent</option>
+                      {(selectedProjectIdForCreation 
+                        ? projects.find(p => p.id === Number(selectedProjectIdForCreation))?.workItems || [] 
+                        : []
+                      ).filter((item: any) => item.workType === 'Epic').map((item: any) => (
+                        <option key={item.id} value={item.id}>
+                          {item.workNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Due Date & Start Date Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Due Date */}
-                <div className="form-group">
-                  <label htmlFor="funcDueDate">Due date</label>
-                  <input
-                    id="funcDueDate"
-                    type="date"
-                    className="form-input"
-                    value={functionalDueDate}
-                    onChange={(e) => setFunctionalDueDate(e.target.value)}
-                  />
-                </div>
+              {functionalWorkType !== 'Bug' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Due Date */}
+                  <div className="form-group">
+                    <label htmlFor="funcDueDate">Due date</label>
+                    <input
+                      id="funcDueDate"
+                      type="date"
+                      className="form-input"
+                      value={functionalDueDate}
+                      onChange={(e) => setFunctionalDueDate(e.target.value)}
+                    />
+                  </div>
 
-                {/* Start Date */}
-                <div className="form-group">
-                  <label htmlFor="funcStartDate">Start date</label>
-                  <input
-                    id="funcStartDate"
-                    type="date"
-                    className="form-input"
-                    value={functionalStartDate}
-                    onChange={(e) => setFunctionalStartDate(e.target.value)}
-                  />
+                  {/* Start Date */}
+                  <div className="form-group">
+                    <label htmlFor="funcStartDate">Start date</label>
+                    <input
+                      id="funcStartDate"
+                      type="date"
+                      className="form-input"
+                      value={functionalStartDate}
+                      onChange={(e) => setFunctionalStartDate(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Labels & Team Row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Labels */}
-                <div className="form-group">
-                  <label htmlFor="funcLabels">Labels</label>
-                  <select
-                    id="funcLabels"
-                    className="form-select"
-                    value={functionalLabel}
-                    onChange={(e) => setFunctionalLabel(e.target.value)}
-                  >
-                    <option value="">Select label</option>
-                    <option value="frontend">Frontend</option>
-                    <option value="backend">Backend</option>
-                    <option value="ui/ux">UI/UX</option>
-                    <option value="bugfix">Bugfix</option>
-                    <option value="database">Database</option>
-                    <option value="documentation">Documentation</option>
-                  </select>
-                </div>
+                {functionalWorkType !== 'Bug' ? (
+                  <div className="form-group">
+                    <label htmlFor="funcLabels">Labels</label>
+                    <select
+                      id="funcLabels"
+                      className="form-select"
+                      value={functionalLabel}
+                      onChange={(e) => setFunctionalLabel(e.target.value)}
+                    >
+                      <option value="">Select label</option>
+                      <option value="frontend">Frontend</option>
+                      <option value="backend">Backend</option>
+                      <option value="ui/ux">UI/UX</option>
+                      <option value="bugfix">Bugfix</option>
+                      <option value="database">Database</option>
+                      <option value="documentation">Documentation</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div></div> /* spacing spacer */
+                )}
 
                 {/* Team */}
                 <div className="form-group">
@@ -1288,29 +1333,37 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* Action Buttons Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
-                {/* Create Another Checkbox */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={createAnother}
-                    onChange={(e) => setCreateAnother(e.target.checked)}
-                    style={{
-                      accentColor: 'var(--primary)',
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer'
-                    }}
-                  />
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Create another</span>
-                </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
+                  Cancel
+                </button>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
-                    Cancel
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button 
+                    type="submit" 
+                    className="btn btn-secondary" 
+                    style={{ borderColor: 'var(--border-medium)', color: 'var(--text-secondary)' }}
+                    onClick={() => setSubmissionType('copy')}
+                    disabled={creatingWorkItem}
+                  >
+                    {creatingWorkItem && submissionType === 'copy' ? 'Creating...' : 'Create Copy'}
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={creatingWorkItem}>
-                    {creatingWorkItem ? 'Creating...' : 'Create'}
+                  <button 
+                    type="submit" 
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    onClick={() => setSubmissionType('another')}
+                    disabled={creatingWorkItem}
+                  >
+                    {creatingWorkItem && submissionType === 'another' ? 'Creating...' : 'Create Another'}
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    onClick={() => setSubmissionType('standard')}
+                    disabled={creatingWorkItem}
+                  >
+                    {creatingWorkItem && submissionType === 'standard' ? 'Creating...' : 'Create'}
                   </button>
                 </div>
               </div>

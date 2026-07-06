@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { api, PersonalNoteDto } from '../services/api';
+import { api, PersonalNoteDto, EmployeeDropdownDto } from '../services/api';
 import { toast } from '../services/toast';
-import { FileText, Calendar, Trash2, PlusCircle, Filter, RotateCcw, AlertCircle, Edit2 } from 'lucide-react';
+import { FileText, Calendar, Trash2, PlusCircle, Filter, RotateCcw, AlertCircle, Edit2, User } from 'lucide-react';
+import { useAuth } from '../App';
 
 export default function MyNotes() {
+  const { user } = useAuth();
   const [notes, setNotes] = useState<PersonalNoteDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,6 +14,7 @@ export default function MyNotes() {
   const [content, setContent] = useState('');
   const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0]);
   const [priority, setPriority] = useState('medium');
+  const [assignedToUserId, setAssignedToUserId] = useState<number | ''>('');
   const [saving, setSaving] = useState(false);
 
   // Filter State
@@ -19,11 +22,25 @@ export default function MyNotes() {
   const [noteToDelete, setNoteToDelete] = useState<number | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
 
+  // Active employees list
+  const [employees, setEmployees] = useState<EmployeeDropdownDto[]>([]);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await api.getEmployeesDropdown();
+        if (res.success) setEmployees(res.data);
+      } catch (err) {}
+    };
+    fetchEmployees();
+  }, []);
+
   const handleStartEdit = (note: PersonalNoteDto) => {
     setEditingNoteId(note.id);
     setContent(note.content);
     setNoteDate(note.noteDate.split('T')[0]);
     setPriority(note.priority);
+    setAssignedToUserId(note.assignedToUserId || '');
   };
 
   const handleCancelEdit = () => {
@@ -31,6 +48,7 @@ export default function MyNotes() {
     setContent('');
     setNoteDate(new Date().toISOString().split('T')[0]);
     setPriority('medium');
+    setAssignedToUserId('');
   };
 
   const fetchNotes = async (dateStr?: string) => {
@@ -59,10 +77,11 @@ export default function MyNotes() {
     if (!content.trim()) return;
 
     setSaving(true);
+    const assignedIdVal = assignedToUserId === '' ? null : Number(assignedToUserId);
     try {
       if (editingNoteId !== null) {
         // Update
-        const res = await api.updatePersonalNote(editingNoteId, content, noteDate, priority);
+        const res = await api.updatePersonalNote(editingNoteId, content, noteDate, priority, assignedIdVal);
         if (res.success) {
           handleCancelEdit();
           fetchNotes(filterDate || undefined);
@@ -72,11 +91,12 @@ export default function MyNotes() {
         }
       } else {
         // Create
-        const res = await api.createPersonalNote(content, noteDate, priority);
+        const res = await api.createPersonalNote(content, noteDate, priority, assignedIdVal);
         if (res.success) {
           setContent('');
           setNoteDate(new Date().toISOString().split('T')[0]);
           setPriority('medium');
+          setAssignedToUserId('');
           fetchNotes(filterDate || undefined);
           toast.success('Note saved successfully!');
         } else {
@@ -154,6 +174,24 @@ export default function MyNotes() {
                 <option value="medium" style={{ background: 'var(--bg-app)' }}>Medium 🔵</option>
                 <option value="high" style={{ background: 'var(--bg-app)' }}>High 🟠</option>
                 <option value="critical" style={{ background: 'var(--bg-app)' }}>Critical 🔴</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="assignTo">Assign To</label>
+              <select
+                id="assignTo"
+                className="form-input"
+                value={assignedToUserId}
+                onChange={(e) => setAssignedToUserId(e.target.value === '' ? '' : Number(e.target.value))}
+                style={{ background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-normal)' }}
+              >
+                <option value="" style={{ background: 'var(--bg-app)' }}>-- Keep Personal (No Assignment) --</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id} style={{ background: 'var(--bg-app)' }}>
+                    {emp.name} ({emp.email})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -267,45 +305,59 @@ export default function MyNotes() {
                         <span className={`badge badge-${note.priority.toLowerCase()}`} style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize' }}>
                           {note.priority}
                         </span>
+                        {note.assignedToUserName && (
+                          <span className="badge" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                            <User size={12} />
+                            Assign To: {note.assignedToUserName}
+                          </span>
+                        )}
+                        {note.creatorUserName && (
+                          <span className="badge" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                            <User size={12} />
+                            From: {note.creatorUserId === user?.userId ? 'Me' : note.creatorUserName}
+                          </span>
+                        )}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-                        <button 
-                          onClick={() => handleStartEdit(note)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px',
-                            transition: 'color 0.2s, background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(50, 150, 250, 0.1)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                          title="Edit Note"
-                        >
-                          <Edit2 size={15} />
-                        </button>
+                      {note.creatorUserId === user?.userId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={() => handleStartEdit(note)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              transition: 'color 0.2s, background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(50, 150, 250, 0.1)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            title="Edit Note"
+                          >
+                            <Edit2 size={15} />
+                          </button>
 
-                        <button 
-                          onClick={() => setNoteToDelete(note.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px',
-                            transition: 'color 0.2s, background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                          title="Delete Note"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                          <button 
+                            onClick={() => setNoteToDelete(note.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              transition: 'color 0.2s, background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            title="Delete Note"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Content */}

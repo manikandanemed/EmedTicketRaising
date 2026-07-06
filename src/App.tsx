@@ -94,7 +94,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontWeight: 800, fontSize: '1.4rem', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center' }}>
-            <span style={{ color: '#FBBF24' }}>E</span><span style={{ color: '#fff' }}>medWorld</span>
+            <span style={{ color: '#FBBF24' }}>e</span><span style={{ color: '#fff' }}>Med Ticketing System</span>
           </span>
         </div>
         
@@ -389,7 +389,7 @@ export default function App() {
           <Layers size={28} color="#fff" />
         </div>
         <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
-          Loading EmedWorld...
+          Loading eMed Ticketing System...
         </span>
       </div>
     );

@@ -51,6 +51,15 @@ export interface ModuleDto {
   createdAt: string;
 }
 
+export interface SoftwareBuildDto {
+  id: number;
+  buildNumber: string;
+  projectId: number;
+  projectName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface ProjectDto {
   id: number;
   projectNumber: string;
@@ -77,9 +86,12 @@ export interface WorkItemDto {
   parentId?: number | null;
   parentWorkNumber?: string | null;
   parentTitle?: string | null;
+  parentEpicName?: string | null;
+  parentEpicColor?: string | null;
   labels?: string | null;
   team?: string | null;
   attachmentUrls?: string | null;
+  projectId: number;
   projectName: string;
   projectNumber: string;
   assignedTo?: string;
@@ -92,6 +104,13 @@ export interface WorkItemDto {
   productName?: string;
   clientId?: number;
   clientName?: string;
+  epicName?: string | null;
+  epicColor?: string | null;
+  severity?: string | null;
+  assignedToUserId?: number | null;
+  fixedBillNumber?: string | null;
+  raisedBillNumber?: string | null;
+  developerBillLock?: boolean;
 }
 
 export interface EmployeeDropdownDto {
@@ -121,6 +140,9 @@ export interface BugDto {
   workItemId: number;
   raisedBy: string;
   assignedTo: string | null;
+  raisedBuild?: string | null;
+  fixedBuild?: string | null;
+  severity?: string | null;
   createdAt: string;
   fixedAt: string | null;
   closedAt: string | null;
@@ -133,6 +155,18 @@ export interface CommentDto {
   postedBy: string;
   workItemTitle: string;
   createdAt: string;
+}
+
+export interface WorkItemActivityLogDto {
+  id: number;
+  action: string;
+  fromUser?: string | null;
+  toUser?: string | null;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  byUser: string;
+  note?: string | null;
+  timestamp: string;
 }
 
 export interface WorkItemStatusCountDto {
@@ -177,6 +211,10 @@ export interface PersonalNoteDto {
   createdAt: string;
   noteDate: string;
   priority: string;
+  assignedToUserId?: number | null;
+  assignedToUserName?: string | null;
+  creatorUserId: number;
+  creatorUserName?: string | null;
 }
 
 export interface EmployeeWorkItemCountDto {
@@ -328,13 +366,14 @@ export const api = {
   getMyWorkItems: () => request<WorkItemDto[]>('/api/project/workitems/myworks'),
 
   // Paginated + filtered employee work items
-  getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string } = {}) => {
+  getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string; workType?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.page)     q.set('page',     String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
     if (params.status)   q.set('status',   params.status);
     if (params.dueDate)  q.set('dueDate',  params.dueDate);
     if (params.search)   q.set('search',   params.search);
+    if (params.workType) q.set('workType', params.workType);
     return request<PagedResult<WorkItemDto>>(`/api/project/workitems/myworks/paged?${q}`);
   },
 
@@ -343,17 +382,25 @@ export const api = {
 
   getEmployeesDropdown: () => request<EmployeeDropdownDto[]>('/api/project/employees/dropdown'),
 
-  updateWorkItemStatus: (workItemId: number, status: string) =>
-    request<WorkItemDto>(`/api/project/workitems/${workItemId}/status`, {
+  updateWorkItemStatus: (workItemId: number, payload: string | { status: string; fixedBillNumber?: string; raisedBillNumber?: string; developerBillLock?: boolean }) => {
+    const bodyObj = typeof payload === 'string' ? { status: payload } : payload;
+    return request<WorkItemDto>(`/api/project/workitems/${workItemId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }),
-    }),
+      body: JSON.stringify(bodyObj),
+    });
+  },
 
   reassignWorkItem: (workItemId: number, assignedToUserId: number | null) =>
     request<WorkItemDto>(`/api/project/workitems/${workItemId}/reassign`, {
       method: 'PUT',
       body: JSON.stringify({ assignedToUserId }),
     }),
+
+  getWorkItemActivity: (workItemId: number) =>
+    request<WorkItemActivityLogDto[]>(`/api/project/workitems/${workItemId}/activity`),
+
+  getInvolvedWorkItems: () =>
+    request<WorkItemDto[]>(`/api/project/workitems/myworks/involved`),
 
   uploadAttachment: (file: File) => {
     const formData = new FormData();
@@ -404,10 +451,10 @@ export const api = {
     return request<PagedResult<BugDto>>(`/api/project/workitems/bugs/all/paged?${q}`);
   },
 
-  updateBugStatus: (bugId: number, status: string) =>
+  updateBugStatus: (bugId: number, status: string, fixedBuild?: string | null) =>
     request<BugDto>(`/api/project/workitems/bugs/${bugId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, fixedBuild }),
     }),
 
   reassignBug: (bugId: number, assignedToUserId: number | null) =>
@@ -463,6 +510,35 @@ export const api = {
       body: JSON.stringify({ name, description, productId }),
     }),
 
+  getBuildsByProject: (projectId: number) =>
+    request<SoftwareBuildDto[]>(`/api/project/${projectId}/builds`),
+
+  createBuild: (buildNumber: string, projectId: number) =>
+    request<SoftwareBuildDto>('/api/project/builds', {
+      method: 'POST',
+      body: JSON.stringify({ buildNumber, projectId }),
+    }),
+
+  deleteBuild: (buildId: number) =>
+    request<string>(`/api/project/builds/${buildId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteClient: (clientId: number) =>
+    request<string>(`/api/project/clients/${clientId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteProduct: (productId: number) =>
+    request<string>(`/api/project/products/${productId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteModule: (moduleId: number) =>
+    request<string>(`/api/project/modules/${moduleId}`, {
+      method: 'DELETE',
+    }),
+
   deleteProject: (projectId: number) =>
     request<string>(`/api/project/${projectId}`, {
       method: 'DELETE',
@@ -477,16 +553,16 @@ export const api = {
   getPersonalNotes: (date?: string) =>
     request<PersonalNoteDto[]>(`/api/project/personalnotes${date ? `?date=${date}` : ''}`),
 
-  createPersonalNote: (content: string, noteDate?: string, priority?: string) =>
+  createPersonalNote: (content: string, noteDate?: string, priority?: string, assignedToUserId?: number | null) =>
     request<PersonalNoteDto>('/api/project/personalnotes', {
       method: 'POST',
-      body: JSON.stringify({ content, noteDate, priority }),
+      body: JSON.stringify({ content, noteDate, priority, assignedToUserId }),
     }),
 
-  updatePersonalNote: (id: number, content: string, noteDate?: string, priority?: string) =>
+  updatePersonalNote: (id: number, content: string, noteDate?: string, priority?: string, assignedToUserId?: number | null) =>
     request<PersonalNoteDto>(`/api/project/personalnotes/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ content, noteDate, priority }),
+      body: JSON.stringify({ content, noteDate, priority, assignedToUserId }),
     }),
 
   deletePersonalNote: (id: number) =>

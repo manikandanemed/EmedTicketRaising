@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  api, BugDto, WorkItemDto, CommentDto, API_BASE_URL
+  api, BugDto, WorkItemDto, CommentDto, SoftwareBuildDto, API_BASE_URL
 } from '../services/api';
 import { useAuth } from '../App';
 import { toast } from '../services/toast';
@@ -15,6 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
   open: '#f43f5e',
   in_progress: '#f59e0b',
   fixed: '#22c55e',
+  resolved: '#10b981',
   closed: '#6b7280',
 };
 
@@ -28,6 +29,9 @@ export default function BugDetails() {
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Builds state
+  const [projectBuilds, setProjectBuilds] = useState<SoftwareBuildDto[]>([]);
 
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -46,7 +50,13 @@ export default function BugDetails() {
           if (found) {
             setBug(found);
             const wiRes = await api.getWorkItemById(found.workItemId);
-            if (wiRes.success) setWorkItem(wiRes.data);
+            if (wiRes.success) {
+              setWorkItem(wiRes.data);
+              try {
+                const buildsRes = await api.getBuildsByProject(wiRes.data.projectId);
+                if (buildsRes.success) setProjectBuilds(buildsRes.data);
+              } catch (_) {}
+            }
             const cmtRes = await api.getCommentsByWorkItem(found.workItemId);
             if (cmtRes.success) setComments(cmtRes.data);
           } else {
@@ -64,11 +74,17 @@ export default function BugDetails() {
 
   const handleStatusChange = async (status: string) => {
     if (!bug) return;
+    let fixedBuild: string | null = null;
+    if (status === 'fixed') {
+      const buildOptions = projectBuilds.map(b => b.buildNumber).join(', ');
+      fixedBuild = window.prompt(`Please enter the Fixed Build Number (${buildOptions || 'no builds registered'}):`);
+      if (fixedBuild === null) return; // cancel
+    }
     setUpdatingStatus(true);
     try {
-      const res = await api.updateBugStatus(bug.id, status);
+      const res = await api.updateBugStatus(bug.id, status, fixedBuild);
       if (res.success) {
-        setBug(prev => prev ? { ...prev, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt } : prev);
+        setBug(prev => prev ? { ...prev, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : prev);
         toast.success('Bug status updated!');
       }
     } catch (e: any) {
@@ -121,6 +137,7 @@ export default function BugDetails() {
     open: <AlertCircle size={14} />,
     in_progress: <Clock size={14} />,
     fixed: <CheckCircle2 size={14} />,
+    resolved: <CheckCircle2 size={14} />,
     closed: <CheckCircle2 size={14} />,
   };
 
@@ -308,6 +325,7 @@ export default function BugDetails() {
                 { key: 'open', label: 'Open', icon: <AlertCircle size={14} />, color: '#f43f5e' },
                 { key: 'in_progress', label: 'In Progress', icon: <Clock size={14} />, color: '#f59e0b' },
                 { key: 'fixed', label: 'Fixed', icon: <CheckCircle2 size={14} />, color: '#22c55e' },
+                { key: 'resolved', label: 'Resolved', icon: <CheckCircle2 size={14} />, color: '#10b981' },
                 { key: 'closed', label: 'Closed', icon: <CheckCircle2 size={14} />, color: '#6b7280' },
               ].map(s => (
                 <button
@@ -358,10 +376,24 @@ export default function BugDetails() {
                 <span style={{ color: 'var(--text-muted)' }}>Reported:</span>
                 <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
               </div>
+              {bug.raisedBuild && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                  <CheckCircle2 size={14} color="var(--primary)" />
+                  <span style={{ color: 'var(--text-muted)' }}>Raised Build:</span>
+                  <span style={{ fontWeight: 600 }}>{bug.raisedBuild}</span>
+                </div>
+              )}
+              {bug.fixedBuild && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                  <CheckCircle2 size={14} color="#22c55e" />
+                  <span style={{ color: 'var(--text-muted)' }}>Fixed Build:</span>
+                  <span style={{ color: '#22c55e', fontWeight: 600 }}>{bug.fixedBuild}</span>
+                </div>
+              )}
               {bug.fixedAt && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
                   <CheckCircle2 size={14} color="#22c55e" />
-                  <span style={{ color: 'var(--text-muted)' }}>Fixed:</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Fixed Date:</span>
                   <span style={{ color: '#22c55e', fontWeight: 600 }}>{new Date(bug.fixedAt).toLocaleDateString()}</span>
                 </div>
               )}

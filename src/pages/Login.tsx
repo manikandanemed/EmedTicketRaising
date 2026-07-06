@@ -112,7 +112,7 @@ export default function Login() {
             Welcome back 👋
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Sign in to continue to <strong style={{ color: 'var(--text-secondary)' }}>EmedWorld</strong>
+            Sign in to continue to <strong style={{ color: 'var(--text-secondary)' }}>eMed Ticketing System</strong>
           </p>
         </div>
 

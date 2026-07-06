@@ -6,6 +6,10 @@ import {
   ProjectDto, 
   WorkItemDto, 
   EmployeeDropdownDto,
+  SoftwareBuildDto,
+  ClientDto,
+  ProductDto,
+  ModuleDto,
   API_BASE_URL
 } from '../services/api';
 import { useAuth } from '../App';
@@ -68,7 +72,8 @@ export default function Projects() {
   const [workItemsLoading, setWorkItemsLoading] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [workItemSearchQuery, setWorkItemSearchQuery] = useState('');
-  const [workItemStatusFilter, setWorkItemStatusFilter] = useState('all');
+  const [workItemStatusFilters, setWorkItemStatusFilters] = useState<string[]>([]);
+  const [workItemStatusDropdownOpen, setWorkItemStatusDropdownOpen] = useState(false);
   const [workItemAssigneeFilter, setWorkItemAssigneeFilter] = useState('all');
   const [workItemDateFilter, setWorkItemDateFilter] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
@@ -78,7 +83,6 @@ export default function Projects() {
     { id: 'assigned', title: 'ASSIGNED', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.04)', border: 'rgba(148, 163, 184, 0.15)' },
     { id: 'reopened', title: 'REOPEN', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.04)', border: 'rgba(148, 163, 184, 0.15)' },
     { id: 'in_progress', title: 'IN PROGRESS', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.04)', border: 'rgba(56, 189, 248, 0.15)' },
-    { id: 'waiting_customer', title: 'WAITING FOR CUSTOMER', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.04)', border: 'rgba(56, 189, 248, 0.15)' },
     { id: 'future_release', title: 'MOVED TO FUTURE RELEASE', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.04)', border: 'rgba(56, 189, 248, 0.15)' },
     { id: 'completed', title: 'RESOLVED', color: '#4ade80', bg: 'rgba(74, 222, 128, 0.04)', border: 'rgba(74, 222, 128, 0.15)' }
   ];
@@ -181,7 +185,13 @@ export default function Projects() {
   // Client, Product, Module states
   const [clients, setClients] = useState<ClientDto[]>([]);
   const [showHierarchyManager, setShowHierarchyManager] = useState(false);
-  const [hierarchyTab, setHierarchyTab] = useState<'clients' | 'products' | 'modules'>('clients');
+  const [hierarchyTab, setHierarchyTab] = useState<'clients' | 'products' | 'modules' | 'builds'>('clients');
+
+  // Build states
+  const [builds, setBuilds] = useState<SoftwareBuildDto[]>([]);
+  const [selectedProjectIdForBuild, setSelectedProjectIdForBuild] = useState<number | ''>('');
+  const [newBuildNumber, setNewBuildNumber] = useState('');
+  const [creatingBuild, setCreatingBuild] = useState(false);
 
   const [newClientName, setNewClientName] = useState('');
   const [newClientDesc, setNewClientDesc] = useState('');
@@ -217,6 +227,12 @@ export default function Projects() {
   const [employees, setEmployees] = useState<EmployeeDropdownDto[]>([]);
   const [creatingWorkItem, setCreatingWorkItem] = useState(false);
   const [workTitleError, setWorkTitleError] = useState('');
+  // Epic & Bug extra fields
+  const [bugSeverity, setBugSeverity] = useState('3');
+  const [bugIssueType, setBugIssueType] = useState('New');
+  const [newEpicName, setNewEpicName] = useState('');
+  const [newEpicColor, setNewEpicColor] = useState('purple');
+  const [submissionType, setSubmissionType] = useState<'standard' | 'another' | 'copy'>('standard');
 
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<ProjectDto | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
@@ -248,7 +264,7 @@ export default function Projects() {
       const res = await api.getWorkItemsByProjectPaged(projectId, {
         page: workItemPage,
         pageSize: WORK_ITEMS_PER_PAGE,
-        status: workItemStatusFilter !== 'all' ? workItemStatusFilter : undefined,
+        status: workItemStatusFilters.length > 0 ? workItemStatusFilters.join(',') : undefined,
         search: workItemSearchQuery || undefined
       });
       if (res.success) {
@@ -673,6 +689,110 @@ export default function Projects() {
     }
   };
 
+  const fetchBuilds = async (projectId: number) => {
+    try {
+      const res = await api.getBuildsByProject(projectId);
+      if (res.success) setBuilds(res.data);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load builds');
+    }
+  };
+
+  const handleCreateBuild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjectIdForBuild) {
+      toast.error('Please select a project');
+      return;
+    }
+    if (!newBuildNumber.trim()) {
+      toast.error('Build number is required');
+      return;
+    }
+
+    setCreatingBuild(true);
+    try {
+      const res = await api.createBuild(newBuildNumber.trim(), Number(selectedProjectIdForBuild));
+      if (res.success) {
+        setBuilds([res.data, ...builds]);
+        setNewBuildNumber('');
+        toast.success('Build created successfully!');
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create build');
+    } finally {
+      setCreatingBuild(false);
+    }
+  };
+
+  const handleDeleteBuild = async (buildId: number) => {
+    if (!window.confirm('Are you sure you want to delete this build?')) return;
+    try {
+      const res = await api.deleteBuild(buildId);
+      if (res.success) {
+        setBuilds(builds.filter(b => b.id !== buildId));
+        toast.success('Build deleted successfully!');
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete build');
+    }
+  };
+
+  const handleDeleteClient = async (clientId: number) => {
+    if (!window.confirm('Are you sure you want to delete this client? This will set Client to None on associated projects.')) return;
+    try {
+      const res = await api.deleteClient(clientId);
+      if (res.success) {
+        setClients(clients.filter(c => c.id !== clientId));
+        toast.success('Client deleted successfully!');
+        fetchProjects();
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete client');
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    if (!window.confirm('Are you sure you want to delete this product? This will cascade delete modules and set Product to None on associated items.')) return;
+    try {
+      const res = await api.deleteProduct(productId);
+      if (res.success) {
+        setProducts(products.filter(p => p.id !== productId));
+        toast.success('Product deleted successfully!');
+        if (selectedProjectIdForProduct) {
+          fetchProducts(Number(selectedProjectIdForProduct));
+        }
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete product');
+    }
+  };
+
+  const handleDeleteModule = async (moduleId: number) => {
+    if (!window.confirm('Are you sure you want to delete this module? This will set Module to None on associated tasks.')) return;
+    try {
+      const res = await api.deleteModule(moduleId);
+      if (res.success) {
+        setModules(modules.filter(m => m.id !== moduleId));
+        toast.success('Module deleted successfully!');
+        if (selectedProductIdForModule) {
+          fetchModules(Number(selectedProductIdForModule));
+        }
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete module');
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchEmployees();
@@ -694,12 +814,12 @@ export default function Projects() {
     if (selectedProject) {
       fetchWorkItems(selectedProject.id);
     }
-  }, [selectedProject?.id, workItemPage, workItemStatusFilter, workItemSearchQuery]);
+  }, [selectedProject?.id, workItemPage, workItemStatusFilters, workItemSearchQuery]);
 
   // Reset page to 1 on filter changes
   useEffect(() => {
     setWorkItemPage(1);
-  }, [workItemSearchQuery, workItemStatusFilter]);
+  }, [workItemSearchQuery, workItemStatusFilters]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -840,12 +960,16 @@ export default function Projects() {
         workType: functionalWorkType,
         startDate: functionalStartDate || null,
         dueDate: functionalDueDate || null,
-        parentId: functionalParentId === '' ? null : Number(functionalParentId),
+        parentId: functionalWorkType === 'Epic' ? null : (functionalParentId === '' ? null : Number(functionalParentId)),
         labels: functionalLabel || null,
         team: functionalTeam || null,
         attachmentUrls: uploadedAttachmentUrls.join(',') || null,
         assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId),
-        moduleId: selectedModuleIdForCreation === '' ? null : Number(selectedModuleIdForCreation)
+        moduleId: selectedModuleIdForCreation === '' ? null : Number(selectedModuleIdForCreation),
+        epicName: functionalWorkType === 'Epic' ? newEpicName || newWorkTitle : null,
+        epicColor: functionalWorkType === 'Epic' ? newEpicColor : null,
+        severity: functionalWorkType === 'Bug' ? bugSeverity : null,
+        issueType: functionalWorkType === 'Bug' ? bugIssueType : null
       });
 
       if (res.success) {
@@ -859,12 +983,15 @@ export default function Projects() {
 
         toast.success('Work item created successfully!');
 
-        if (createAnother) {
+        if (submissionType === 'another' || createAnother) {
           // Keep modal open, only clear summary (title), description & attachments
           setNewWorkTitle('');
           setNewWorkDesc('');
           setUploadedAttachmentUrls([]);
           setWorkTitleError('');
+        } else if (submissionType === 'copy') {
+          // Keep all form state intact so they can create a copy immediately
+          toast.info('Form values kept. You can now modify and create a copy.');
         } else {
           // Close modal and reset fields
           setShowCreateFunctional(false);
@@ -884,6 +1011,10 @@ export default function Projects() {
           setSelectedModuleIdForCreation('');
           setProductsForCreation([]);
           setModulesForCreation([]);
+          setBugSeverity('3');
+          setBugIssueType('New');
+          setNewEpicName('');
+          setNewEpicColor('purple');
         }
       }
     } catch (err: any) {
@@ -914,6 +1045,65 @@ export default function Projects() {
     }
   };
 
+  // ── Epic & Severity badge helpers ──────────────────────────────────────
+  const EPIC_COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
+    purple: { bg: 'rgba(147,51,234,0.18)', border: 'rgba(147,51,234,0.4)', text: '#c084fc' },
+    blue:   { bg: 'rgba(59,130,246,0.18)',  border: 'rgba(59,130,246,0.4)',  text: '#60a5fa' },
+    teal:   { bg: 'rgba(20,184,166,0.18)',  border: 'rgba(20,184,166,0.4)',  text: '#2dd4bf' },
+    green:  { bg: 'rgba(34,197,94,0.18)',   border: 'rgba(34,197,94,0.4)',   text: '#4ade80' },
+    orange: { bg: 'rgba(249,115,22,0.18)',  border: 'rgba(249,115,22,0.4)',  text: '#fb923c' },
+    red:    { bg: 'rgba(239,68,68,0.18)',   border: 'rgba(239,68,68,0.4)',   text: '#f87171' },
+  };
+  const renderEpicBadge = (item: WorkItemDto) => {
+    if (item.workType === 'Epic' && (item.epicName || item.title)) {
+      const color = EPIC_COLOR_MAP[item.epicColor || 'purple'] || EPIC_COLOR_MAP.purple;
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: color.bg, border: `1px solid ${color.border}`, color: color.text, letterSpacing: '0.01em', whiteSpace: 'nowrap' }}>
+          ⚡ {item.epicName || item.title}
+        </span>
+      );
+    }
+    if (item.parentEpicName) {
+      const color = EPIC_COLOR_MAP[item.parentEpicColor || 'purple'] || EPIC_COLOR_MAP.purple;
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: color.bg, border: `1px solid ${color.border}`, color: color.text, letterSpacing: '0.01em', whiteSpace: 'nowrap' }}>
+          ⚡ {item.parentEpicName}
+        </span>
+      );
+    }
+    return null;
+  };
+  const SEVERITY_COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
+    '1': { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.35)',  text: '#4ade80' },
+    '2': { bg: 'rgba(56,189,248,0.15)',  border: 'rgba(56,189,248,0.35)',  text: '#38bdf8' },
+    '3': { bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.35)',  text: '#facc15' },
+    '4': { bg: 'rgba(249,115,22,0.15)',  border: 'rgba(249,115,22,0.35)', text: '#fb923c' },
+    '5': { bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.35)',  text: '#f87171' },
+    '6': { bg: 'rgba(220,38,38,0.25)',   border: 'rgba(220,38,38,0.45)',  text: '#ef4444' },
+    minor:    { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.35)',  text: '#4ade80' },
+    major:    { bg: 'rgba(234,179,8,0.15)',   border: 'rgba(234,179,8,0.35)',  text: '#facc15' },
+    critical: { bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.35)', text: '#fb923c' },
+    blocker:  { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.35)',  text: '#f87171' },
+  };
+  const renderSeverityBadge = (severity?: string | null) => {
+    if (!severity) return null;
+    const key = severity.toLowerCase();
+    const c = SEVERITY_COLOR_MAP[key] || SEVERITY_COLOR_MAP['3'];
+    const icons: Record<string, string> = { 
+      '1': '🟢', '2': '🔵', '3': '🟡', '4': '🟠', '5': '🔴', '6': '⛔',
+      minor: '🟢', major: '🟡', critical: '🔴', blocker: '⛔' 
+    };
+    const label = (key === '1' || key === '2' || key === '3' || key === '4' || key === '5' || key === '6') 
+      ? `Severity ${key}` 
+      : severity.charAt(0).toUpperCase() + severity.slice(1);
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', background: c.bg, border: `1px solid ${c.border}`, color: c.text, whiteSpace: 'nowrap' }}>
+        {icons[key] || ''} {label}
+      </span>
+    );
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   return (
     <div>
       {/* If a project is selected, show details layout */}
@@ -926,7 +1116,7 @@ export default function Projects() {
               onClick={() => { 
                 setSelectedProject(null); 
                 setWorkItemSearchQuery(''); 
-                setWorkItemStatusFilter('all'); 
+                setWorkItemStatusFilters([]); 
                 setWorkItemAssigneeFilter('all');
                 setWorkItemDateFilter('');
               }}
@@ -1050,7 +1240,7 @@ export default function Projects() {
                 setShowCreateFunctional(true);
               }} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <PlusCircle size={16} />
-                Create Functional Requirement
+                Create
               </button>
             </div>
           </div>
@@ -1110,34 +1300,130 @@ export default function Projects() {
                   );
                 })()}
 
-                {/* Status Filter */}
-                <select
-                  className="form-select"
-                  value={workItemStatusFilter}
-                  onChange={(e) => setWorkItemStatusFilter(e.target.value)}
-                  style={{ 
-                    width: '180px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--border-soft)',
-                    color: 'var(--text-primary)',
-                    height: '38px',
-                    padding: '0 40px 0 12px',
-                    borderRadius: 'var(--radius-md)',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="pending">TO DO</option>
-                  <option value="assigned">ASSIGNED</option>
-                  <option value="reopened">REOPEN</option>
-                  <option value="in_progress">IN PROGRESS</option>
-                  <option value="waiting_customer">WAITING FOR CUSTOMER</option>
-                  <option value="future_release">MOVED TO FUTURE RELEASE</option>
-                  <option value="fixed">FIXED</option>
-                  <option value="completed">RESOLVED</option>
-                  <option value="closed">CLOSED</option>
-                </select>
+                {/* Checkbox Multi-Select Status Dropdown */}
+                <div style={{ position: 'relative', width: '180px' }}>
+                  <button
+                    type="button"
+                    className="form-select"
+                    onClick={() => setWorkItemStatusDropdownOpen(!workItemStatusDropdownOpen)}
+                    style={{
+                      width: '180px',
+                      textAlign: 'left',
+                      textOverflow: 'ellipsis',
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid var(--border-soft)',
+                      color: 'var(--text-primary)',
+                      height: '38px',
+                      padding: '0 30px 0 12px',
+                      borderRadius: 'var(--radius-md)',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    {workItemStatusFilters.length === 0 
+                      ? 'All Statuses' 
+                      : `${workItemStatusFilters.length} Selected`}
+                  </button>
+
+                  {workItemStatusDropdownOpen && (
+                    <>
+                      <div 
+                        onClick={() => setWorkItemStatusDropdownOpen(false)} 
+                        style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                      />
+                      <div 
+                        className="glass-panel" 
+                        style={{
+                          position: 'absolute',
+                          top: '42px',
+                          left: 0,
+                          right: 0,
+                          zIndex: 999,
+                          background: '#FFFFFF',
+                          border: '1px solid var(--border-soft)',
+                          borderRadius: 'var(--radius-md)',
+                          boxShadow: 'var(--shadow-lg)',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          maxHeight: '260px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {[
+                          { id: 'pending', label: 'TO DO' },
+                          { id: 'assigned', label: 'ASSIGNED' },
+                          { id: 'reopened', label: 'REOPEN' },
+                          { id: 'in_progress', label: 'IN PROGRESS' },
+                          { id: 'future_release', label: 'MOVED TO FUTURE' },
+                          { id: 'fixed', label: 'FIXED' },
+                          { id: 'completed', label: 'RESOLVED' },
+                          { id: 'closed', label: 'CLOSED' }
+                        ].map((item) => {
+                          const checked = workItemStatusFilters.includes(item.id);
+                          return (
+                            <label 
+                              key={item.id} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                color: 'var(--text-primary)',
+                                padding: '4px 6px',
+                                borderRadius: '4px',
+                                transition: 'background-color 0.15s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-glow)'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  if (checked) {
+                                    setWorkItemStatusFilters(prev => prev.filter(x => x !== item.id));
+                                  } else {
+                                    setWorkItemStatusFilters(prev => [...prev, item.id]);
+                                  }
+                                }}
+                                style={{
+                                  accentColor: 'var(--primary)',
+                                  width: '15px',
+                                  height: '15px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                              <span>{item.label}</span>
+                            </label>
+                          );
+                        })}
+                        <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => setWorkItemStatusFilters([])}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            Clear All
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => setWorkItemStatusDropdownOpen(false)}
+                            style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {/* Date Filter */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1299,6 +1585,13 @@ export default function Projects() {
                                   <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.workNumber}</span>
                                   <span className={`badge badge-${item.priority}`} style={{ fontSize: '0.7rem', padding: '1px 6px' }}>{item.priority}</span>
                                 </div>
+                                {/* Epic / Severity badges */}
+                                {(renderEpicBadge(item) || renderSeverityBadge(item.severity)) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '-2px' }}>
+                                    {renderEpicBadge(item)}
+                                    {renderSeverityBadge(item.severity)}
+                                  </div>
+                                )}
                                 <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{item.title}</h5>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F1F5F9', paddingTop: '8px', marginTop: '2px' }}>
                                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1339,23 +1632,31 @@ export default function Projects() {
                           <tr key={`task-${item.id}`}>
                             <td><input type="checkbox" /></td>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {renderWorkTypeIcon(item.workType)}
-                                <a
-                                  onClick={() => navigate(`/workitems/${item.id}`)}
-                                  style={{
-                                    color: 'var(--primary)',
-                                    fontWeight: 700,
-                                    textDecoration: 'underline',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {item.workNumber}
-                                </a>
-                                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                  {item.title}
-                                </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {renderWorkTypeIcon(item.workType)}
+                                  <a
+                                    onClick={() => navigate(`/workitems/${item.id}`)}
+                                    style={{
+                                      color: 'var(--primary)',
+                                      fontWeight: 700,
+                                      textDecoration: 'underline',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {item.workNumber}
+                                  </a>
+                                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                    {item.title}
+                                  </span>
+                                </div>
+                                {(renderEpicBadge(item) || renderSeverityBadge(item.severity)) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', paddingLeft: '22px' }}>
+                                    {renderEpicBadge(item)}
+                                    {renderSeverityBadge(item.severity)}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td>{renderUserAvatarAndName(item.assignedTo)}</td>
@@ -1384,7 +1685,6 @@ export default function Projects() {
                                 <option value="assigned">ASSIGNED</option>
                                 <option value="reopened">REOPEN</option>
                                 <option value="in_progress">IN PROGRESS</option>
-                                <option value="waiting_customer">WAITING FOR CUSTOMER</option>
                                 <option value="future_release">MOVED TO FUTURE RELEASE</option>
                                 <option value="fixed">FIXED</option>
                                 <option value="completed">RESOLVED</option>
@@ -1476,7 +1776,7 @@ export default function Projects() {
                     setShowCreateFunctional(true);
                   }} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <PlusCircle size={16} />
-                    Create Functional Requirement
+                    Create
                   </button>
                 </>
               )}
@@ -1607,7 +1907,7 @@ export default function Projects() {
               <X size={24} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Functional Requirements</h2>
+            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Work Item</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1717,9 +2017,17 @@ export default function Projects() {
                     id="funcWorkType"
                     className="form-select"
                     value={functionalWorkType}
-                    onChange={(e) => setFunctionalWorkType(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFunctionalWorkType(val);
+                      if (val === 'Bug') {
+                        setFunctionalStatus('new');
+                      } else {
+                        setFunctionalStatus('pending');
+                      }
+                    }}
                   >
-                    <option value="Epic">⚡ Epic</option>
+                    {isPM && <option value="Epic">⚡ Epic</option>}
                     <option value="Task">☑️ Task</option>
                     <option value="Functional Requirements">⚡ Functional Requirements</option>
                     <option value="Design Update">⚠️ Design Update</option>
@@ -1736,17 +2044,42 @@ export default function Projects() {
                     value={functionalStatus}
                     onChange={(e) => setFunctionalStatus(e.target.value)}
                   >
-                    <option value="pending">TO DO</option>
-                    <option value="assigned">ASSIGNED</option>
-                    <option value="reopened">REOPEN</option>
-                    <option value="in_progress">IN PROGRESS</option>
-                    <option value="waiting_customer">WAITING FOR CUSTOMER</option>
-                    <option value="future_release">MOVED TO FUTURE RELEASE</option>
-                    <option value="fixed">FIXED</option>
-                    <option value="completed">RESOLVED</option>
+                    {functionalWorkType === 'Bug' ? (
+                      <>
+                        <option value="new">New</option>
+                        <option value="open">Open</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="pending">TO DO</option>
+                        <option value="assigned">ASSIGNED</option>
+                        <option value="reopened">REOPEN</option>
+                        <option value="in_progress">IN PROGRESS</option>
+                        <option value="future_release">MOVED TO FUTURE RELEASE</option>
+                        <option value="fixed">FIXED</option>
+                        <option value="completed">RESOLVED</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
+
+              {/* Bug Issue Type Row */}
+              {functionalWorkType === 'Bug' && (
+                <div className="form-group">
+                  <label htmlFor="bugIssueType">Issue Type</label>
+                  <select
+                    id="bugIssueType"
+                    className="form-select"
+                    value={bugIssueType}
+                    onChange={(e) => setBugIssueType(e.target.value)}
+                  >
+                    <option value="New">New</option>
+                    <option value="Reopen">Reopen</option>
+                    <option value="Regression">Regression</option>
+                  </select>
+                </div>
+              )}
 
               {/* Summary */}
               <div className="form-group">
@@ -1796,29 +2129,7 @@ export default function Projects() {
               {/* Assignee Selection */}
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="funcAssignee" style={{ marginBottom: 0 }}>Assignee</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (user?.userId) {
-                        setNewWorkAssignedId(user.userId);
-                      } else {
-                        toast.error('No logged-in user session found');
-                      }
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#38bdf8',
-                      cursor: 'pointer',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      padding: 0,
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    Assign to me
-                  </button>
+                  <label htmlFor="funcAssignee" style={{ marginBottom: 0 }}>Assign To</label>
                 </div>
                 <select
                   id="funcAssignee"
@@ -1835,7 +2146,7 @@ export default function Projects() {
                 </select>
               </div>
 
-              {/* Priority & Parent Row */}
+              {/* Priority + Conditional: Severity (Bug) | Epic Name+Color (Epic) | Epic Link (Others) */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Priority */}
                 <div className="form-group">
@@ -1846,88 +2157,151 @@ export default function Projects() {
                     value={newWorkPriority}
                     onChange={(e) => setNewWorkPriority(e.target.value as any)}
                   >
-                    <option value="low">〓 Low</option>
-                    <option value="medium">＝ Medium</option>
-                    <option value="high">▲ High</option>
-                    <option value="critical">▲ Critical</option>
+                    <option value="low">🔽 Low</option>
+                    <option value="medium">🔶 Medium</option>
+                    <option value="high">🔴 High</option>
+                    <option value="critical">🚨 Critical</option>
                   </select>
                 </div>
 
-                {/* Parent Selection */}
-                <div className="form-group">
-                  <label htmlFor="funcParent">Parent</label>
-                  <select
-                    id="funcParent"
-                    className="form-select"
-                    value={functionalParentId}
-                    onChange={(e) => setFunctionalParentId(e.target.value === '' ? '' : Number(e.target.value))}
-                  >
-                    <option value="">Select parent</option>
-                    {(selectedProjectIdForCreation 
-                      ? projects.find(p => p.id === Number(selectedProjectIdForCreation))?.workItems || [] 
-                      : []
-                    ).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.workNumber} - {item.title} ({item.workType || 'Task'})
-                      </option>
-                    ))}
-                  </select>
-                  <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
-                    Your work type hierarchy determines the work items you can select here.
-                  </span>
-                </div>
+                {/* Bug → Severity */}
+                {functionalWorkType === 'Bug' && (
+                  <div className="form-group">
+                    <label htmlFor="funcSeverity">Severity</label>
+                    <select
+                      id="funcSeverity"
+                      className="form-select"
+                      value={bugSeverity}
+                      onChange={(e) => setBugSeverity(e.target.value)}
+                    >
+                      <option value="1">1 (Lowest)</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6 (Highest)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Epic → Epic Color */}
+                {functionalWorkType === 'Epic' && (
+                  <div className="form-group">
+                    <label htmlFor="funcEpicColor">Epic Color</label>
+                    <select
+                      id="funcEpicColor"
+                      className="form-select"
+                      value={newEpicColor}
+                      onChange={(e) => setNewEpicColor(e.target.value)}
+                    >
+                      <option value="purple">🟣 Purple</option>
+                      <option value="blue">🔵 Blue</option>
+                      <option value="teal">💠 Teal</option>
+                      <option value="green">🟢 Green</option>
+                      <option value="orange">🟠 Orange</option>
+                      <option value="red">🔴 Red</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Task/FR/Design → Epic Link */}
+                {functionalWorkType !== 'Bug' && functionalWorkType !== 'Epic' && (
+                  <div className="form-group">
+                    <label htmlFor="funcParent">Epic Link</label>
+                    <select
+                      id="funcParent"
+                      className="form-select"
+                      value={functionalParentId}
+                      onChange={(e) => setFunctionalParentId(e.target.value === '' ? '' : Number(e.target.value))}
+                    >
+                      <option value="">No Epic</option>
+                      {(selectedProjectIdForCreation
+                        ? projects.find(p => p.id === Number(selectedProjectIdForCreation))?.workItems || []
+                        : []
+                      ).filter(item => item.workType === 'Epic').map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.workNumber}
+                        </option>
+                      ))}
+                    </select>
+                    <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                      Link this item to an existing Epic.
+                    </span>
+                  </div>
+                )}
               </div>
+
+              {/* Epic → Epic Name (short label) */}
+              {functionalWorkType === 'Epic' && (
+                <div className="form-group">
+                  <label htmlFor="funcEpicName">Epic Name <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(short label shown on cards)</span></label>
+                  <input
+                    id="funcEpicName"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Auth Flow, Billing, Core UI…"
+                    value={newEpicName}
+                    onChange={(e) => setNewEpicName(e.target.value)}
+                  />
+                </div>
+              )}
+
 
               {/* Due Date & Start Date Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Due Date */}
-                <div className="form-group">
-                  <label htmlFor="funcDueDate">Due date</label>
-                  <input
-                    id="funcDueDate"
-                    type="date"
-                    className="form-input"
-                    value={functionalDueDate}
-                    onChange={(e) => setFunctionalDueDate(e.target.value)}
-                  />
-                </div>
+              {functionalWorkType !== 'Bug' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Due Date */}
+                  <div className="form-group">
+                    <label htmlFor="funcDueDate">Due date</label>
+                    <input
+                      id="funcDueDate"
+                      type="date"
+                      className="form-input"
+                      value={functionalDueDate}
+                      onChange={(e) => setFunctionalDueDate(e.target.value)}
+                    />
+                  </div>
 
-                {/* Start Date */}
-                <div className="form-group">
-                  <label htmlFor="funcStartDate">Start date</label>
-                  <input
-                    id="funcStartDate"
-                    type="date"
-                    className="form-input"
-                    value={functionalStartDate}
-                    onChange={(e) => setFunctionalStartDate(e.target.value)}
-                  />
-                  <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
-                    Allows the planned start date for a piece of work to be set.
-                  </span>
+                  {/* Start Date */}
+                  <div className="form-group">
+                    <label htmlFor="funcStartDate">Start date</label>
+                    <input
+                      id="funcStartDate"
+                      type="date"
+                      className="form-input"
+                      value={functionalStartDate}
+                      onChange={(e) => setFunctionalStartDate(e.target.value)}
+                    />
+                    <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                      Allows the planned start date for a piece of work to be set.
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Labels & Team Row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Labels */}
-                <div className="form-group">
-                  <label htmlFor="funcLabels">Labels</label>
-                  <select
-                    id="funcLabels"
-                    className="form-select"
-                    value={functionalLabel}
-                    onChange={(e) => setFunctionalLabel(e.target.value)}
-                  >
-                    <option value="">Select label</option>
-                    <option value="frontend">Frontend</option>
-                    <option value="backend">Backend</option>
-                    <option value="ui/ux">UI/UX</option>
-                    <option value="bugfix">Bugfix</option>
-                    <option value="database">Database</option>
-                    <option value="documentation">Documentation</option>
-                  </select>
-                </div>
+                {functionalWorkType !== 'Bug' ? (
+                  <div className="form-group">
+                    <label htmlFor="funcLabels">Labels</label>
+                    <select
+                      id="funcLabels"
+                      className="form-select"
+                      value={functionalLabel}
+                      onChange={(e) => setFunctionalLabel(e.target.value)}
+                    >
+                      <option value="">Select label</option>
+                      <option value="frontend">Frontend</option>
+                      <option value="backend">Backend</option>
+                      <option value="database">Database</option>
+                      <option value="testing">Testing</option>
+                      <option value="documentation">Documentation</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div></div> /* spacing spacer */
+                )}
 
                 {/* Team */}
                 <div className="form-group">
@@ -2071,29 +2445,37 @@ export default function Projects() {
               </div>
 
               {/* Action Buttons Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
-                {/* Create Another Checkbox */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={createAnother}
-                    onChange={(e) => setCreateAnother(e.target.checked)}
-                    style={{
-                      accentColor: 'var(--primary)',
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer'
-                    }}
-                  />
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Create another</span>
-                </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
+                  Cancel
+                </button>
 
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
-                    Cancel
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button 
+                    type="submit" 
+                    className="btn btn-secondary" 
+                    style={{ borderColor: 'var(--border-medium)', color: 'var(--text-secondary)' }}
+                    onClick={() => setSubmissionType('copy')}
+                    disabled={creatingWorkItem || uploadingFiles}
+                  >
+                    {creatingWorkItem && submissionType === 'copy' ? 'Creating...' : 'Create Copy'}
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={creatingWorkItem || uploadingFiles}>
-                    {creatingWorkItem ? 'Creating...' : 'Create'}
+                  <button 
+                    type="submit" 
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    onClick={() => setSubmissionType('another')}
+                    disabled={creatingWorkItem || uploadingFiles}
+                  >
+                    {creatingWorkItem && submissionType === 'another' ? 'Creating...' : 'Create Another'}
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    onClick={() => setSubmissionType('standard')}
+                    disabled={creatingWorkItem || uploadingFiles}
+                  >
+                    {creatingWorkItem && submissionType === 'standard' ? 'Creating...' : 'Create'}
                   </button>
                 </div>
               </div>
@@ -2256,7 +2638,7 @@ export default function Projects() {
 
             {/* Tab navigation */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)', marginBottom: '24px', gap: '16px' }}>
-              {(['clients', 'products', 'modules'] as const).map(tab => (
+              {(['clients', 'products', 'modules', 'builds'] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
@@ -2327,6 +2709,7 @@ export default function Projects() {
                           <th>Client Code</th>
                           <th>Name</th>
                           <th>Description</th>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2335,6 +2718,16 @@ export default function Projects() {
                             <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{c.clientNumber}</td>
                             <td style={{ fontWeight: 600 }}>{c.name}</td>
                             <td>{c.description || '-'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleDeleteClient(c.id)}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -2412,6 +2805,7 @@ export default function Projects() {
                           <th>Product Code</th>
                           <th>Name</th>
                           <th>Description</th>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2420,6 +2814,16 @@ export default function Projects() {
                             <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.productNumber}</td>
                             <td style={{ fontWeight: 600 }}>{p.name}</td>
                             <td>{p.description || '-'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleDeleteProduct(p.id)}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -2531,6 +2935,7 @@ export default function Projects() {
                           <th>Module Code</th>
                           <th>Name</th>
                           <th>Description</th>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2539,6 +2944,101 @@ export default function Projects() {
                             <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{m.moduleNumber}</td>
                             <td style={{ fontWeight: 600 }}>{m.name}</td>
                             <td>{m.description || '-'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleDeleteModule(m.id)}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT: BUILDS */}
+            {hierarchyTab === 'builds' && (
+              <div>
+                <form onSubmit={handleCreateBuild} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
+                  <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Software Build</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label htmlFor="buildProject">Select Project <span style={{ color: 'var(--danger)' }}>*</span></label>
+                      <select
+                        id="buildProject"
+                        className="form-select"
+                        value={selectedProjectIdForBuild}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          setSelectedProjectIdForBuild(val);
+                          if (val) fetchBuilds(val);
+                          else setBuilds([]);
+                        }}
+                      >
+                        <option value="">Choose Project...</option>
+                        {projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label htmlFor="buildNum">Build Number <span style={{ color: 'var(--danger)' }}>*</span></label>
+                      <input
+                        id="buildNum"
+                        type="text"
+                        placeholder="e.g. v1.0.0"
+                        className="form-input"
+                        value={newBuildNumber}
+                        onChange={(e) => setNewBuildNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn-primary" disabled={creatingBuild}>
+                    {creatingBuild ? 'Adding...' : 'Add Build'}
+                  </button>
+                </form>
+
+                <h4 style={{ marginBottom: '12px', fontWeight: 700 }}>
+                  {selectedProjectIdForBuild ? `Builds in this Project` : `Select a project to view builds`}
+                </h4>
+                {!selectedProjectIdForBuild ? (
+                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>Choose a project from the dropdown above to filter builds.</p>
+                ) : builds.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>No builds registered under this project yet.</p>
+                ) : (
+                  <div className="table-container">
+                    <table className="custom-table" style={{ fontSize: '0.9rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Build Number</th>
+                          <th>Created At</th>
+                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {builds.map(b => (
+                          <tr key={b.id}>
+                            <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{b.buildNumber}</td>
+                            <td>{new Date(b.createdAt).toLocaleString()}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleDeleteBuild(b.id)}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

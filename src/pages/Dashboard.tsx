@@ -556,6 +556,7 @@ export default function Dashboard() {
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
             <option value="fixed">Fixed</option>
+            <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
           </select>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -605,6 +606,7 @@ export default function Dashboard() {
                     open:        { color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
                     in_progress: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
                     fixed:       { color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+                    resolved:    { color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
                     closed:      { color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
                   };
                   const sc = statusColors[bug.status] || { color: 'var(--text-muted)', bg: 'transparent' };

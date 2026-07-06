@@ -110,7 +110,7 @@ export default function Register() {
             Create account 🚀
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Join <strong style={{ color: 'var(--text-secondary)' }}>EmedWorld</strong> and start tracking
+            Join <strong style={{ color: 'var(--text-secondary)' }}>eMed Ticketing System</strong> and start tracking
           </p>
         </div>
 
