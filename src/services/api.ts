@@ -363,7 +363,6 @@ export const api = {
     return request<PagedResult<WorkItemDto>>(`/api/project/${projectId}/workitems/paged?${q}`);
   },
 
-  getMyWorkItems: () => request<WorkItemDto[]>('/api/project/workitems/myworks'),
 
   // Paginated + filtered employee work items
   getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string; workType?: string } = {}) => {
@@ -429,17 +428,6 @@ export const api = {
 
   getMyBugs: () => request<BugDto[]>('/api/project/workitems/bugs/mybugs'),
 
-  getMyBugsPaged: (params: { page?: number; pageSize?: number; status?: string; date?: string; search?: string } = {}) => {
-    const q = new URLSearchParams();
-    if (params.page)     q.set('page',     String(params.page));
-    if (params.pageSize) q.set('pageSize', String(params.pageSize));
-    if (params.status)   q.set('status',   params.status);
-    if (params.date)     q.set('date',     params.date);
-    if (params.search)   q.set('search',   params.search);
-    return request<PagedResult<BugDto>>(`/api/project/workitems/bugs/mybugs/paged?${q}`);
-  },
-
-  getAllBugs: () => request<BugDto[]>('/api/project/workitems/bugs/all'),
 
   getAllBugsPaged: (params: { page?: number; pageSize?: number; status?: string; date?: string; search?: string } = {}) => {
     const q = new URLSearchParams();
