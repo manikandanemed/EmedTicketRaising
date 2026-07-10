@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -397,9 +397,13 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, login, logout, updateUser }}>
-      <Router>
+       <BrowserRouter basename={import.meta.env.BASE_URL}>
+          {/* <Router> */}
+        
         <AppContent />
-      </Router>
+      {/* </Router> */}
+       </BrowserRouter>
+   
     </AuthContext.Provider>
   );
 }

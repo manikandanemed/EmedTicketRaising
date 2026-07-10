@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://localhost:5298';
+export const API_BASE_URL = '/ticket-system';
 
 export interface ApiResponse<T> {
   success: boolean;
