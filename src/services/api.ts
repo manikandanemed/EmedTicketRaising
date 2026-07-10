@@ -21,6 +21,7 @@ export interface UserSession {
   userId: number;
   email?: string;
   profilePicture?: string;
+  roles?: string[];
 }
 
 export interface ClientDto {
@@ -296,9 +297,21 @@ async function request<T>(
 export const api = {
   // Authentication
   login: (body: any) =>
-    request<UserSession>('/api/auth/login', {
+    request<any>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+
+  verifyOtp: (body: any) =>
+    request<UserSession>('/api/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  switchRole: (targetRole: 'ProductManager' | 'Employee') =>
+    request<UserSession>('/api/auth/switch-role', {
+      method: 'POST',
+      body: JSON.stringify({ targetRole }),
     }),
 
   registerEmployee: (body: any) =>

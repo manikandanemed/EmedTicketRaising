@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
-import { UserSession, API_BASE_URL } from './services/api';
+import { UserSession, API_BASE_URL, api } from './services/api';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -46,7 +46,7 @@ export const useAuth = () => {
 
 // Protected Layout
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -121,15 +121,59 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {initials[0]}
             </div>
             <span>{user.name}</span>
-            <span style={{
-              fontSize: '0.72rem',
-              background: 'rgba(255,255,255,0.2)',
-              padding: '2px 8px',
-              borderRadius: '10px',
-              fontWeight: 500
-            }}>
-              {isPM ? 'Product Manager' : 'Employee'}
-            </span>
+            {user.roles && user.roles.length > 1 ? (
+              <select
+                value={user.userType}
+                onChange={async (e) => {
+                  const targetRole = e.target.value as 'ProductManager' | 'Employee';
+                  try {
+                    const res = await api.switchRole(targetRole);
+                    if (res.success) {
+                      updateUser(res.data);
+                      toast.success(`Switched role to ${targetRole === 'ProductManager' ? 'Product Manager' : 'Employee'}`);
+                      navigate('/');
+                    } else {
+                      toast.error('Failed to switch role');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message || 'Error switching role');
+                  }
+                }}
+                style={{
+                  fontSize: '0.72rem',
+                  background: 'rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  appearance: 'none',
+                  textAlign: 'center',
+                  paddingRight: '16px',
+                  position: 'relative',
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg fill='white' height='12' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 4px center',
+                }}
+              >
+                <option value="Employee" style={{ color: '#1E293B' }}>Employee</option>
+                <option value="ProductManager" style={{ color: '#1E293B' }}>Product Manager</option>
+              </select>
+            ) : (
+              <span style={{
+                fontSize: '0.72rem',
+                background: 'rgba(255,255,255,0.2)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontWeight: 500
+              }}>
+                {isPM ? 'Product Manager' : 'Employee'}
+              </span>
+            )}
           </div>
 
           <button
@@ -347,7 +391,8 @@ export default function App() {
       name: session.name || session.Name,
       userId: session.userId || session.UserId,
       email: session.email || session.Email,
-      profilePicture: session.profilePicture || session.ProfilePicture
+      profilePicture: session.profilePicture || session.ProfilePicture,
+      roles: session.roles || session.Roles || []
     };
     if (token) {
       localStorage.setItem('token', token);

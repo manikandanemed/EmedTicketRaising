@@ -15,20 +15,42 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState<'ProductManager' | 'Employee'>('Employee');
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showOtp, setShowOtp] = useState(false);
+  const [otp, setOtp] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await api.login({ userName: email, password, userType });
-      if (res.success) {
-        login(res.data);
-        navigate('/');
+      if (!showOtp) {
+        const res = await api.login({ userName: email, password });
+        if (res.success && res.data?.otpRequired) {
+          setShowOtp(true);
+          const roles = res.data.roles || res.data.Roles || [];
+          setAvailableRoles(roles);
+          if (roles.length > 0) {
+            setUserType(roles[0]);
+          }
+          toast.success(res.message || 'OTP sent to your email');
+        } else if (res.success) {
+          login(res.data);
+          navigate('/');
+        } else {
+          setError(res.message || 'Login failed');
+        }
       } else {
-        setError(res.message || 'Login failed');
+        const res = await api.verifyOtp({ userName: email, otp, userType });
+        if (res.success) {
+          login(res.data);
+          navigate('/');
+          toast.success('Logged in successfully');
+        } else {
+          setError(res.message || 'Verification failed');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Invalid credentials or connection issue');
@@ -116,30 +138,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Role Toggle */}
-        <div style={{ marginBottom: '24px' }}>
-          <p style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-            Sign in as
-          </p>
-          <div className="role-toggle">
-            <button
-              type="button"
-              className={`role-toggle-btn ${userType === 'Employee' ? 'active' : ''}`}
-              onClick={() => setUserType('Employee')}
-            >
-              <UserIcon size={15} />
-              Employee
-            </button>
-            <button
-              type="button"
-              className={`role-toggle-btn ${userType === 'ProductManager' ? 'active' : ''}`}
-              onClick={() => setUserType('ProductManager')}
-            >
-              <Shield size={15} />
-              Manager
-            </button>
-          </div>
-        </div>
+        {/* Role toggle has been moved to the OTP verification screen dynamically */}
 
         {/* Error */}
         {error && (
@@ -157,58 +156,155 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={16} style={{
-                position: 'absolute', left: '14px', top: '50%',
-                transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
-              }} />
-              <input
-                id="email" type="email" className="form-input"
-                placeholder="you@company.com"
-                style={{ paddingLeft: '42px' }}
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+          {!showOtp ? (
+            <>
+              {/* Email */}
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{
+                    position: 'absolute', left: '14px', top: '50%',
+                    transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
+                  }} />
+                  <input
+                    id="email" type="email" className="form-input"
+                    placeholder="you@company.com"
+                    style={{ paddingLeft: '42px' }}
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-          {/* Password */}
-          <div className="form-group" style={{ marginBottom: '8px' }}>
-            <label htmlFor="password">Password</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={16} style={{
-                position: 'absolute', left: '14px', top: '50%',
-                transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
-              }} />
-              <input
-                id="password" type="password" className="form-input"
-                placeholder="••••••••"
-                style={{ paddingLeft: '42px' }}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+              {/* Password */}
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label htmlFor="password">Password</label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{
+                    position: 'absolute', left: '14px', top: '50%',
+                    transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
+                  }} />
+                  <input
+                    id="password" type="password" className="form-input"
+                    placeholder="••••••••"
+                    style={{ paddingLeft: '42px' }}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-          {/* Forgot */}
-          <div style={{ textAlign: 'right', marginBottom: '24px' }}>
-            <button
-              type="button"
-              onClick={() => toast.info('Please contact your Product Manager to reset your password.')}
-              style={{
-                background: 'none', border: 'none',
-                color: 'var(--primary-hover)', fontSize: '0.8rem',
-                cursor: 'pointer', fontWeight: 500,
-              }}
-            >
-              Forgot Password?
-            </button>
-          </div>
+              {/* Forgot */}
+              <div style={{ textAlign: 'right', marginBottom: '24px' }}>
+                <button
+                  type="button"
+                  onClick={() => toast.info('Please contact your Product Manager to reset your password.')}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: 'var(--primary-hover)', fontSize: '0.8rem',
+                    cursor: 'pointer', fontWeight: 500,
+                  }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* OTP Message */}
+              <div style={{
+                background: 'rgba(100,180,255,0.06)',
+                border: '1px solid rgba(100,180,255,0.15)',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '20px',
+                fontSize: '0.88rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.4
+              }}>
+                An OTP has been sent to your email <strong>{email}</strong>. Please check your inbox and enter the 6-digit code.
+              </div>
+
+              {/* OTP Code */}
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label htmlFor="otp">Enter Verification Code</label>
+                <div style={{ position: 'relative' }}>
+                  <Shield size={16} style={{
+                    position: 'absolute', left: '14px', top: '50%',
+                    transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
+                  }} />
+                  <input
+                    id="otp" type="text" className="form-input"
+                    placeholder="123456"
+                    maxLength={6}
+                    style={{ paddingLeft: '42px', letterSpacing: '4px', fontSize: '1.1rem', fontWeight: 700 }}
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Role Dropdown */}
+              {availableRoles.length > 1 ? (
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label htmlFor="login-role">Select Role to Login As</label>
+                  <div style={{ position: 'relative' }}>
+                    <Shield size={16} style={{
+                      position: 'absolute', left: '14px', top: '50%',
+                      transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
+                    }} />
+                    <select
+                      id="login-role"
+                      className="form-input"
+                      style={{ paddingLeft: '42px', color: 'var(--text-primary)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                      value={userType}
+                      onChange={e => setUserType(e.target.value as 'ProductManager' | 'Employee')}
+                      required
+                    >
+                      {availableRoles.map(role => (
+                        <option key={role} value={role} style={{ color: '#1E293B' }}>
+                          {role === 'ProductManager' ? 'Product Manager' : 'Employee'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : availableRoles.length === 1 ? (
+                <div style={{
+                  fontSize: '0.85rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <AlertCircle size={14} style={{ color: 'var(--primary)' }} />
+                  <span>Logging in as <strong>{availableRoles[0] === 'ProductManager' ? 'Product Manager' : 'Employee'}</strong></span>
+                </div>
+              ) : null}
+
+              {/* Back to password link */}
+              <div style={{ textAlign: 'right', marginBottom: '24px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtp(false);
+                    setOtp('');
+                  }}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: 'var(--primary-hover)', fontSize: '0.8rem',
+                    cursor: 'pointer', fontWeight: 500,
+                  }}
+                >
+                  Back to Password Login
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Submit */}
           <button
@@ -223,24 +319,16 @@ export default function Login() {
                   display: 'inline-block', width: '16px', height: '16px',
                   border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
                   borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                  marginRight: '8px', verticalAlign: 'middle',
                 }} />
-                Signing in...
+                {showOtp ? 'Verifying OTP...' : 'Signing in...'}
               </>
             ) : (
-              <>Sign In <ArrowRight size={16} /></>
+              <>{showOtp ? 'Verify OTP & Log In' : 'Sign In'} <ArrowRight size={16} style={{ marginLeft: '6px', verticalAlign: 'middle' }} /></>
             )}
           </button>
         </form>
 
-        <div style={{
-          textAlign: 'center', marginTop: '24px',
-          fontSize: '0.88rem', color: 'var(--text-muted)',
-        }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--primary-hover)', fontWeight: 600, textDecoration: 'none' }}>
-            Create one here
-          </Link>
-        </div>
       </div>
     </div>
   );

@@ -10,4 +10,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'serve' ? '/' : '/ticket-system/',
+  server: {
+    proxy: {
+      '/ticket-system/api': {
+        target: 'http://localhost:5298',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ticket-system/, ''),
+      }
+    }
+  }
 }));
