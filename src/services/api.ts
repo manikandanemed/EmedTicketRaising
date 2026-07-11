@@ -314,6 +314,18 @@ export const api = {
       body: JSON.stringify({ targetRole }),
     }),
 
+  forgotPassword: (email: string) =>
+    request<string>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPasswordWithOtp: (body: any) =>
+    request<string>('/api/auth/reset-password-otp', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   registerEmployee: (body: any) =>
     request<any>('/api/auth/register/employee', {
       method: 'POST',

@@ -1754,10 +1754,6 @@ export default function Projects() {
                     <Download size={18} />
                     Export All (CSV)
                   </button>
-                  <button className="btn btn-secondary" onClick={() => { setJiraCsvFile(null); setImportSummary(null); setShowImportJira(true); }} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Upload size={18} />
-                    Import JIRA CSV
-                  </button>
                   <button className="btn btn-secondary" onClick={() => { fetchClients(); setShowHierarchyManager(true); }} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <LayoutGrid size={18} />
                     Hierarchy Setup

@@ -407,9 +407,23 @@ export default function App() {
     setUser(null);
   };
 
-  const updateUser = (updatedUser: UserSession) => {
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    setUser(updatedUser);
+  const updateUser = (updatedUser: any) => {
+    if (!updatedUser) return;
+    const token = updatedUser.token || updatedUser.Token;
+    const userSession: UserSession = {
+      token: token || user?.token || '',
+      userType: updatedUser.userType || updatedUser.UserType,
+      name: updatedUser.name || updatedUser.Name,
+      userId: updatedUser.userId || updatedUser.UserId,
+      email: updatedUser.email || updatedUser.Email,
+      profilePicture: updatedUser.profilePicture || updatedUser.ProfilePicture,
+      roles: updatedUser.roles || updatedUser.Roles || user?.roles || []
+    };
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+    localStorage.setItem('user', JSON.stringify(userSession));
+    setUser(userSession);
   };
 
   if (loading) {
