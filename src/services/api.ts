@@ -127,6 +127,7 @@ export interface EmployeeFullDto {
   mobile?: string;
   isActive: boolean;
   createdAt: string;
+  userType?: string;
 }
 
 export interface BugDto {
@@ -328,6 +329,12 @@ export const api = {
 
   registerEmployee: (body: any) =>
     request<any>('/api/auth/register/employee', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createUser: (body: any) =>
+    request<any>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
     }),

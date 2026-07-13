@@ -3,7 +3,7 @@ import { api, EmployeeFullDto } from '../services/api';
 import { toast } from '../services/toast';
 import {
   Users, Mail, Phone, Calendar, UserX, KeyRound,
-  CheckCircle, XCircle, Loader2, Search, Shield, Pencil
+  CheckCircle, XCircle, Loader2, Search, Shield, Pencil, UserPlus
 } from 'lucide-react';
 
 export default function EmployeeManagement() {
@@ -18,6 +18,51 @@ export default function EmployeeManagement() {
   const [adminNewEmail, setAdminNewEmail] = useState('');
   const [resetSaving, setResetSaving] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
+
+  // User creation states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [createMobile, setCreateMobile] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createRole, setCreateRole] = useState<'Employee' | 'ProductManager' | 'Both'>('Employee');
+  const [createSaving, setCreateSaving] = useState(false);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (createPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const res = await api.createUser({
+        name: createName,
+        email: createEmail,
+        mobile: createMobile || null,
+        password: createPassword,
+        userType: createRole
+      });
+      if (res.success) {
+        toast.success(res.message || 'User created successfully!');
+        setShowCreateModal(false);
+        // Reset states
+        setCreateName('');
+        setCreateEmail('');
+        setCreateMobile('');
+        setCreatePassword('');
+        setCreateRole('Employee');
+        // Reload list
+        fetchEmployees();
+      } else {
+        toast.error(res.message || 'Failed to create user');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'An error occurred during user creation');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -115,6 +160,14 @@ export default function EmployeeManagement() {
           <h1>Employee Management</h1>
           <p>Manage team members, access and credentials</p>
         </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowCreateModal(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <UserPlus size={18} />
+          Create User
+        </button>
       </div>
 
       {/* KPI Strip */}
@@ -181,7 +234,22 @@ export default function EmployeeManagement() {
                   {getInitials(emp.name)}
                 </div>
                 <div className="employee-card-info">
-                  <div className="employee-card-name">{emp.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div className="employee-card-name">{emp.name}</div>
+                    {emp.userType && (
+                      <span style={{
+                        padding: '2px 8px', borderRadius: '4px',
+                        background: emp.userType === 'Both' ? 'linear-gradient(135deg, rgba(14,165,233,0.15) 0%, rgba(139,92,246,0.15) 100%)' :
+                                    emp.userType === 'ProductManager' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)',
+                        color: emp.userType === 'Both' ? 'var(--accent)' :
+                               emp.userType === 'ProductManager' ? '#a78bfa' : 'var(--primary-hover)',
+                        fontSize: '0.68rem', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)'
+                      }}>
+                        {emp.userType === 'Both' ? 'Both Roles' :
+                         emp.userType === 'ProductManager' ? 'Product Manager' : 'Employee'}
+                      </span>
+                    )}
+                  </div>
                   <div className="employee-card-email">{emp.email}</div>
                 </div>
                 {/* Status dot */}
@@ -389,6 +457,130 @@ export default function EmployeeManagement() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+      {/* ── Create User Modal ─────────────── */}
+      {showCreateModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%',
+                background: 'rgba(14,165,233,0.15)', margin: '0 auto 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid rgba(14,165,233,0.3)'
+              }}>
+                <UserPlus size={28} color="var(--primary-hover)" />
+              </div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Create New User</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                Add a new team member and configure their roles
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Full Name */}
+              <div className="form-group">
+                <label htmlFor="createName">Full Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  id="createName"
+                  type="text"
+                  className="form-input"
+                  placeholder="John Doe"
+                  value={createName}
+                  onChange={e => setCreateName(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Email */}
+              <div className="form-group">
+                <label htmlFor="createEmail">Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  id="createEmail"
+                  type="email"
+                  className="form-input"
+                  placeholder="john.doe@company.com"
+                  value={createEmail}
+                  onChange={e => setCreateEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Mobile */}
+              <div className="form-group">
+                <label htmlFor="createMobile">Mobile Number</label>
+                <input
+                  id="createMobile"
+                  type="text"
+                  className="form-input"
+                  placeholder="9876543210"
+                  value={createMobile}
+                  onChange={e => setCreateMobile(e.target.value)}
+                />
+              </div>
+
+              {/* Password */}
+              <div className="form-group">
+                <label htmlFor="createPassword">Password <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  id="createPassword"
+                  type="password"
+                  className="form-input"
+                  placeholder="Min. 6 characters"
+                  value={createPassword}
+                  onChange={e => setCreatePassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Role Dropdown */}
+              <div className="form-group">
+                <label htmlFor="createRole">Role <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <select
+                  id="createRole"
+                  className="form-input"
+                  value={createRole}
+                  onChange={e => setCreateRole(e.target.value as 'Employee' | 'ProductManager' | 'Both')}
+                  style={{ color: 'var(--text-primary)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                  required
+                >
+                  <option value="Employee" style={{ color: '#1E293B' }}>Employee</option>
+                  <option value="ProductManager" style={{ color: '#1E293B' }}>Product Manager</option>
+                  <option value="Both" style={{ color: '#1E293B' }}>Both (Employee & Product Manager)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    // Reset fields
+                    setCreateName('');
+                    setCreateEmail('');
+                    setCreateMobile('');
+                    setCreatePassword('');
+                    setCreateRole('Employee');
+                  }}
+                  style={{ flex: 1 }}
+                  disabled={createSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ flex: 1, gap: '6px' }}
+                  disabled={createSaving}
+                >
+                  {createSaving ? <Loader2 size={14} className="spinner" /> : <UserPlus size={14} />}
+                  {createSaving ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
