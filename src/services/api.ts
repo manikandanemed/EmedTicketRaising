@@ -375,6 +375,12 @@ export const api = {
       body: JSON.stringify({ assignedEmployeeIds }),
     }),
 
+  updateProject: (projectId: number, body: { name: string; description?: string; status: string; clientId?: number }) =>
+    request<ProjectDto>(`/api/project/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
   // Work Items
   createWorkItem: (projectId: number, body: any) =>
     request<WorkItemDto>(`/api/project/${projectId}/workitems`, {
@@ -557,6 +563,30 @@ export const api = {
   deleteModule: (moduleId: number) =>
     request<string>(`/api/project/modules/${moduleId}`, {
       method: 'DELETE',
+    }),
+
+  updateClient: (clientId: number, name: string, description?: string) =>
+    request<ClientDto>(`/api/project/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description }),
+    }),
+
+  updateProduct: (productId: number, name: string, description: string | undefined, projectId: number) =>
+    request<ProductDto>(`/api/project/products/${productId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description, projectId }),
+    }),
+
+  updateModule: (moduleId: number, name: string, description: string | undefined, productId: number) =>
+    request<ModuleDto>(`/api/project/modules/${moduleId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description, productId }),
+    }),
+
+  updateBuild: (buildId: number, buildNumber: string, projectId: number, isActive: boolean) =>
+    request<SoftwareBuildDto>(`/api/project/builds/${buildId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ buildNumber, projectId, isActive }),
     }),
 
   deleteProject: (projectId: number) =>

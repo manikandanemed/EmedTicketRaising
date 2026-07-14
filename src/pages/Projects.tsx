@@ -34,7 +34,8 @@ import {
   LayoutGrid,
   Zap,
   Bug,
-  CheckSquare
+  CheckSquare,
+  Edit
 } from 'lucide-react';
 
 export default function Projects() {
@@ -44,6 +45,7 @@ export default function Projects() {
 
   // State for project list
   const [projects, setProjects] = useState<ProjectDto[]>([]);
+  const [allProjects, setAllProjects] = useState<ProjectDto[]>([]);
   const [projectsTotalCount, setProjectsTotalCount] = useState(0);
   const [projectsTotalPages, setProjectsTotalPages] = useState(1);
   const [projectsLoading, setProjectsLoading] = useState(false);
@@ -210,6 +212,23 @@ export default function Projects() {
   const [newModuleDesc, setNewModuleDesc] = useState('');
   const [creatingModule, setCreatingModule] = useState(false);
 
+  // Inline edit state for Hierarchy Setup
+  const [editingClientId, setEditingClientId] = useState<number | null>(null);
+  const [editClientName, setEditClientName] = useState('');
+  const [editClientDesc, setEditClientDesc] = useState('');
+
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editProductName, setEditProductName] = useState('');
+  const [editProductDesc, setEditProductDesc] = useState('');
+
+  const [editingModuleId, setEditingModuleId] = useState<number | null>(null);
+  const [editModuleName, setEditModuleName] = useState('');
+  const [editModuleDesc, setEditModuleDesc] = useState('');
+
+  const [editingBuildId, setEditingBuildId] = useState<number | null>(null);
+  const [editBuildNumber, setEditBuildNumber] = useState('');
+  const [editBuildIsActive, setEditBuildIsActive] = useState<boolean>(true);
+
   // Dynamic products & modules list inside Create Functional Requirement Modal
   const [productsForCreation, setProductsForCreation] = useState<ProductDto[]>([]);
   const [selectedProductIdForCreation, setSelectedProductIdForCreation] = useState<number | ''>('');
@@ -237,6 +256,15 @@ export default function Projects() {
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<ProjectDto | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
 
+  // Edit Project Details State
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<ProjectDto | null>(null);
+  const [editProjectName, setEditProjectName] = useState('');
+  const [editProjectDesc, setEditProjectDesc] = useState('');
+  const [editProjectStatus, setEditProjectStatus] = useState('active');
+  const [editProjectClientId, setEditProjectClientId] = useState<number | ''>('');
+  const [updatingProject, setUpdatingProject] = useState(false);
+
   const fetchProjects = async () => {
     setProjectsLoading(true);
     try {
@@ -255,6 +283,17 @@ export default function Projects() {
     } finally {
       setProjectsLoading(false);
       setLoading(false);
+    }
+  };
+
+  const fetchAllProjects = async () => {
+    try {
+      const res = await api.getAllProjects();
+      if (res.success) {
+        setAllProjects(res.data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching all projects:', err);
     }
   };
 
@@ -793,10 +832,79 @@ export default function Projects() {
     }
   };
 
+  const handleSaveClientEdit = async (clientId: number) => {
+    if (!editClientName.trim()) {
+      toast.error('Client name is required');
+      return;
+    }
+    try {
+      const res = await api.updateClient(clientId, editClientName.trim(), editClientDesc.trim() || undefined);
+      if (res.success) {
+        toast.success('Client updated successfully!');
+        setClients(prev => prev.map(c => c.id === clientId ? res.data : c));
+        setEditingClientId(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update client');
+    }
+  };
+
+  const handleSaveProductEdit = async (productId: number, projectId: number) => {
+    if (!editProductName.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    try {
+      const res = await api.updateProduct(productId, editProductName.trim(), editProductDesc.trim() || undefined, projectId);
+      if (res.success) {
+        toast.success('Product updated successfully!');
+        setProducts(prev => prev.map(p => p.id === productId ? res.data : p));
+        setEditingProductId(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update product');
+    }
+  };
+
+  const handleSaveModuleEdit = async (moduleId: number, productId: number) => {
+    if (!editModuleName.trim()) {
+      toast.error('Module name is required');
+      return;
+    }
+    try {
+      const res = await api.updateModule(moduleId, editModuleName.trim(), editModuleDesc.trim() || undefined, productId);
+      if (res.success) {
+        toast.success('Module updated successfully!');
+        setModules(prev => prev.map(m => m.id === moduleId ? res.data : m));
+        setEditingModuleId(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update module');
+    }
+  };
+
+  const handleSaveBuildEdit = async (buildId: number, projectId: number) => {
+    if (!editBuildNumber.trim()) {
+      toast.error('Build number is required');
+      return;
+    }
+    try {
+      const res = await api.updateBuild(buildId, editBuildNumber.trim(), projectId, editBuildIsActive);
+      if (res.success) {
+        toast.success('Build updated successfully!');
+        setBuilds(prev => prev.map(b => b.id === buildId ? res.data : b));
+        setEditingBuildId(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update build');
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
     fetchEmployees();
     fetchClients();
+    fetchAllProjects();
   }, []);
 
   // Re-fetch projects when page or search query changes (excluding initial load)
@@ -840,6 +948,7 @@ export default function Projects() {
       });
       if (res.success) {
         setProjects([res.data, ...projects]);
+        setAllProjects([res.data, ...allProjects]);
         setShowCreateProject(false);
         setNewProjectName('');
         setNewProjectDesc('');
@@ -1035,6 +1144,7 @@ export default function Projects() {
       const res = await api.deleteProject(confirmDeleteProject.id);
       if (res.success) {
         setProjects(prev => prev.filter(p => p.id !== confirmDeleteProject.id));
+        setAllProjects(prev => prev.filter(p => p.id !== confirmDeleteProject.id));
         setConfirmDeleteProject(null);
         toast.success('Project deleted successfully!');
       }
@@ -1042,6 +1152,55 @@ export default function Projects() {
       toast.error(err.message || 'Failed to delete project');
     } finally {
       setDeletingProject(false);
+    }
+  };
+
+  const handleOpenEditProject = () => {
+    if (!selectedProject) return;
+    setProjectToEdit(selectedProject);
+    setEditProjectName(selectedProject.name);
+    setEditProjectDesc(selectedProject.description || '');
+    setEditProjectStatus(selectedProject.status || 'active');
+    setEditProjectClientId(selectedProject.clientId || '');
+    setShowEditProject(true);
+  };
+
+  const handleEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectToEdit) return;
+    if (!editProjectName.trim()) {
+      toast.error('Project name is required');
+      return;
+    }
+    setUpdatingProject(true);
+    try {
+      const res = await api.updateProject(projectToEdit.id, {
+        name: editProjectName.trim(),
+        description: editProjectDesc.trim() || undefined,
+        status: editProjectStatus,
+        clientId: editProjectClientId === '' ? undefined : Number(editProjectClientId)
+      });
+      if (res.success) {
+        toast.success('Project updated successfully!');
+        if (selectedProject && selectedProject.id === projectToEdit.id) {
+          setSelectedProject({
+            ...selectedProject,
+            name: res.data.name,
+            description: res.data.description,
+            status: res.data.status,
+            clientId: res.data.clientId,
+            clientName: res.data.clientName
+          });
+        }
+        fetchProjects();
+        fetchAllProjects();
+        setShowEditProject(false);
+        setProjectToEdit(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update project');
+    } finally {
+      setUpdatingProject(false);
     }
   };
 
@@ -1139,7 +1298,18 @@ export default function Projects() {
                     </span>
                   )}
                 </div>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '12px' }}>{selectedProject.name}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                  <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0 }}>{selectedProject.name}</h1>
+                  {isPM && (
+                    <button 
+                      onClick={handleOpenEditProject}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '0.8rem', height: 'fit-content' }}
+                    >
+                      Edit Project
+                    </button>
+                  )}
+                </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '800px', lineHeight: 1.6 }}>
                   {selectedProject.description || 'No description provided for this project.'}
                 </p>
@@ -1767,7 +1937,7 @@ export default function Projects() {
                     Create Project
                   </button>
                   <button className="btn btn-primary" onClick={() => {
-                    setSelectedProjectIdForCreation(projects.length > 0 ? projects[0].id : '');
+                    setSelectedProjectIdForCreation(allProjects.length > 0 ? allProjects[0].id : '');
                     setCreateAnother(false);
                     setShowCreateFunctional(true);
                   }} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1845,6 +2015,27 @@ export default function Projects() {
                               <span>View</span>
                               <ChevronRight size={16} />
                             </div>
+                            {isPM && (
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setProjectToEdit(p);
+                                  setEditProjectName(p.name);
+                                  setEditProjectDesc(p.description || '');
+                                  setEditProjectStatus(p.status || 'active');
+                                  setEditProjectClientId(p.clientId || '');
+                                  setShowEditProject(true);
+                                }}
+                                style={{
+                                  background: 'rgba(59,130,246,0.12)', color: '#3b82f6',
+                                  border: '1px solid rgba(59,130,246,0.25)', borderRadius: 'var(--radius-sm)',
+                                  padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem'
+                                }}
+                                title="Edit project"
+                              >
+                                <Edit size={13} /> Edit
+                              </button>
+                            )}
                             {isPM && (
                               <button
                                 onClick={e => { e.stopPropagation(); setConfirmDeleteProject(p); }}
@@ -1934,7 +2125,7 @@ export default function Projects() {
                   style={projectSelectError ? { borderColor: 'var(--danger)', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.2)' } : {}}
                 >
                   <option value="">Select Space/Project...</option>
-                  {projects.map((p) => (
+                  {allProjects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.projectNumber})
                     </option>
@@ -2133,7 +2324,7 @@ export default function Projects() {
                   value={newWorkAssignedId}
                   onChange={(e) => setNewWorkAssignedId(e.target.value === '' ? '' : Number(e.target.value))}
                 >
-                  <option value="">Automatic</option>
+                  <option value="">-- Unassigned --</option>
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.name} ({emp.email})
@@ -2705,27 +2896,91 @@ export default function Projects() {
                           <th>Client Code</th>
                           <th>Name</th>
                           <th>Description</th>
-                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                          <th style={{ width: '150px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {clients.map(c => (
-                          <tr key={c.id}>
-                            <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{c.clientNumber}</td>
-                            <td style={{ fontWeight: 600 }}>{c.name}</td>
-                            <td>{c.description || '-'}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleDeleteClient(c.id)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Trash2 size={12} /> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {clients.map(c => {
+                          const isEditing = editingClientId === c.id;
+                          return (
+                            <tr key={c.id}>
+                              <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{c.clientNumber}</td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editClientName}
+                                    onChange={(e) => setEditClientName(e.target.value)}
+                                  />
+                                ) : (
+                                  <span style={{ fontWeight: 600 }}>{c.name}</span>
+                                )}
+                              </td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editClientDesc}
+                                    onChange={(e) => setEditClientDesc(e.target.value)}
+                                  />
+                                ) : (
+                                  c.description || '-'
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => handleSaveClientEdit(c.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setEditingClientId(null)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => {
+                                          setEditingClientId(c.id);
+                                          setEditClientName(c.name);
+                                          setEditClientDesc(c.description || '');
+                                        }}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Edit size={12} /> Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={() => handleDeleteClient(c.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Trash2 size={12} /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -2753,7 +3008,7 @@ export default function Projects() {
                         }}
                       >
                         <option value="">Choose Project...</option>
-                        {projects.map(p => (
+                        {allProjects.map(p => (
                           <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
                         ))}
                       </select>
@@ -2801,27 +3056,91 @@ export default function Projects() {
                           <th>Product Code</th>
                           <th>Name</th>
                           <th>Description</th>
-                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                          <th style={{ width: '150px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {products.map(p => (
-                          <tr key={p.id}>
-                            <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.productNumber}</td>
-                            <td style={{ fontWeight: 600 }}>{p.name}</td>
-                            <td>{p.description || '-'}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleDeleteProduct(p.id)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Trash2 size={12} /> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {products.map(p => {
+                          const isEditing = editingProductId === p.id;
+                          return (
+                            <tr key={p.id}>
+                              <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.productNumber}</td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editProductName}
+                                    onChange={(e) => setEditProductName(e.target.value)}
+                                  />
+                                ) : (
+                                  <span style={{ fontWeight: 600 }}>{p.name}</span>
+                                )}
+                              </td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editProductDesc}
+                                    onChange={(e) => setEditProductDesc(e.target.value)}
+                                  />
+                                ) : (
+                                  p.description || '-'
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => handleSaveProductEdit(p.id, p.projectId)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setEditingProductId(null)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => {
+                                          setEditingProductId(p.id);
+                                          setEditProductName(p.name);
+                                          setEditProductDesc(p.description || '');
+                                        }}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Edit size={12} /> Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={() => handleDeleteProduct(p.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Trash2 size={12} /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -2858,7 +3177,7 @@ export default function Projects() {
                         }}
                       >
                         <option value="">Choose Project...</option>
-                        {projects.map(p => (
+                        {allProjects.map(p => (
                           <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
                         ))}
                       </select>
@@ -2931,27 +3250,91 @@ export default function Projects() {
                           <th>Module Code</th>
                           <th>Name</th>
                           <th>Description</th>
-                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                          <th style={{ width: '150px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {modules.map(m => (
-                          <tr key={m.id}>
-                            <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{m.moduleNumber}</td>
-                            <td style={{ fontWeight: 600 }}>{m.name}</td>
-                            <td>{m.description || '-'}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleDeleteModule(m.id)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Trash2 size={12} /> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {modules.map(m => {
+                          const isEditing = editingModuleId === m.id;
+                          return (
+                            <tr key={m.id}>
+                              <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{m.moduleNumber}</td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editModuleName}
+                                    onChange={(e) => setEditModuleName(e.target.value)}
+                                  />
+                                ) : (
+                                  <span style={{ fontWeight: 600 }}>{m.name}</span>
+                                )}
+                              </td>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editModuleDesc}
+                                    onChange={(e) => setEditModuleDesc(e.target.value)}
+                                  />
+                                ) : (
+                                  m.description || '-'
+                                )}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => handleSaveModuleEdit(m.id, m.productId)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setEditingModuleId(null)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => {
+                                          setEditingModuleId(m.id);
+                                          setEditModuleName(m.name);
+                                          setEditModuleDesc(m.description || '');
+                                        }}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Edit size={12} /> Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={() => handleDeleteModule(m.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Trash2 size={12} /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -2979,7 +3362,7 @@ export default function Projects() {
                         }}
                       >
                         <option value="">Choose Project...</option>
-                        {projects.map(p => (
+                        {allProjects.map(p => (
                           <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
                         ))}
                       </select>
@@ -3016,27 +3399,96 @@ export default function Projects() {
                       <thead>
                         <tr>
                           <th>Build Number</th>
+                          <th>Status</th>
                           <th>Created At</th>
-                          <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+                          <th style={{ width: '150px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {builds.map(b => (
-                          <tr key={b.id}>
-                            <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{b.buildNumber}</td>
-                            <td>{new Date(b.createdAt).toLocaleString()}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleDeleteBuild(b.id)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <Trash2 size={12} /> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {builds.map(b => {
+                          const isEditing = editingBuildId === b.id;
+                          return (
+                            <tr key={b.id}>
+                              <td>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
+                                    value={editBuildNumber}
+                                    onChange={(e) => setEditBuildNumber(e.target.value)}
+                                  />
+                                ) : (
+                                  <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{b.buildNumber}</span>
+                                )}
+                              </td>
+                              <td>
+                                {isEditing ? (
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={editBuildIsActive}
+                                      onChange={(e) => setEditBuildIsActive(e.target.checked)}
+                                    />
+                                    <span>Active</span>
+                                  </label>
+                                ) : (
+                                  <span className={`badge ${b.isActive ? 'badge-completed' : 'badge-testing'}`}>
+                                    {b.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                )}
+                              </td>
+                              <td>{new Date(b.createdAt).toLocaleString()}</td>
+                              <td style={{ textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={() => handleSaveBuildEdit(b.id, b.projectId)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setEditingBuildId(null)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => {
+                                          setEditingBuildId(b.id);
+                                          setEditBuildNumber(b.buildNumber);
+                                          setEditBuildIsActive(b.isActive);
+                                        }}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Edit size={12} /> Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={() => handleDeleteBuild(b.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      >
+                                        <Trash2 size={12} /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -3382,6 +3834,86 @@ export default function Projects() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* EDIT PROJECT DETAILS MODAL */}
+      {showEditProject && projectToEdit && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-content glass-panel" style={{ maxWidth: '580px', width: '95%' }}>
+            <button className="modal-close" onClick={() => setShowEditProject(false)}>
+              <X size={24} />
+            </button>
+            <h2 style={{ marginBottom: '24px', fontWeight: 800 }} className="gradient-text">Edit Project Details</h2>
+            <form onSubmit={handleEditProject} noValidate>
+              <div className="form-group">
+                <label htmlFor="editProjName">Project Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  id="editProjName"
+                  type="text"
+                  className="form-input"
+                  value={editProjectName}
+                  onChange={(e) => setEditProjectName(e.target.value)}
+                  placeholder="e.g. Ticketing Dashboard App"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="editProjDesc">Description</label>
+                <textarea
+                  id="editProjDesc"
+                  className="form-textarea"
+                  rows={4}
+                  value={editProjectDesc}
+                  onChange={(e) => setEditProjectDesc(e.target.value)}
+                  placeholder="Details about project scope and goals..."
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                <div className="form-group">
+                  <label htmlFor="editProjStatus">Status</label>
+                  <select
+                    id="editProjStatus"
+                    className="form-select"
+                    value={editProjectStatus}
+                    onChange={(e) => setEditProjectStatus(e.target.value)}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="editProjClient">Client</label>
+                  <select
+                    id="editProjClient"
+                    className="form-select"
+                    value={editProjectClientId}
+                    onChange={(e) => setEditProjectClientId(e.target.value === '' ? '' : Number(e.target.value))}
+                  >
+                    <option value="">-- None --</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditProject(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={updatingProject}>
+                  {updatingProject ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
