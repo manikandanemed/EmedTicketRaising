@@ -14,6 +14,7 @@ import {
 } from '../services/api';
 import { useAuth } from '../App';
 import { toast } from '../services/toast';
+import { useDebounce } from '../hooks/useDebounce';
 import { 
   Briefcase, 
   Plus, 
@@ -52,6 +53,14 @@ export default function Projects() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Fixed Build Modal State
+  const [showFixedBuildModal, setShowFixedBuildModal] = useState(false);
+  const [pendingStatusItemId, setPendingStatusItemId] = useState<number | null>(null);
+  const [pendingStatusValue, setPendingStatusValue] = useState('');
+  const [selectedFixedBuild, setSelectedFixedBuild] = useState('');
+  const [customFixedBuild, setCustomFixedBuild] = useState('');
+  const [modalBuildOptions, setModalBuildOptions] = useState<{ buildNumber: string }[]>([]);
 
   // JIRA import state
   const [showImportJira, setShowImportJira] = useState(false);
@@ -108,6 +117,30 @@ export default function Projects() {
     const item = workItems.find(w => w.id === itemId);
     if (!item || item.status === newStatus) return;
 
+    if (newStatus === 'fixed' || newStatus === 'completed') {
+      setPendingStatusItemId(itemId);
+      setPendingStatusValue(newStatus);
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+      
+      // Update local state optimistically so dropdown changes visually
+      setWorkItems(prev => prev.map(w => w.id === itemId ? { ...w, status: newStatus as any } : w));
+
+      // Load builds dynamically
+      try {
+        const buildsRes = await api.getBuildsByProject(item.projectId);
+        if (buildsRes.success) {
+          setModalBuildOptions(buildsRes.data);
+          if (buildsRes.data.length > 0) {
+            setSelectedFixedBuild(buildsRes.data[0].buildNumber);
+          }
+        }
+      } catch (_) {}
+      
+      setShowFixedBuildModal(true);
+      return;
+    }
+
     // Optimistic Update: Update UI instantly
     const updatedWorkItems = workItems.map(w => 
       w.id === itemId ? { ...w, status: newStatus as any } : w
@@ -115,7 +148,9 @@ export default function Projects() {
     setWorkItems(updatedWorkItems);
 
     try {
-      const res = await api.updateWorkItemStatus(itemId, newStatus);
+      const res = await api.updateWorkItemStatus(itemId, {
+        status: newStatus
+      });
       if (res.success) {
         toast.success('Task status updated!');
       } else {
@@ -131,6 +166,33 @@ export default function Projects() {
   const handleUpdateTaskStatusInProject = async (itemId: number, newStatus: string) => {
     if (!selectedProject) return;
 
+    const item = workItems.find(w => w.id === itemId);
+    if (!item || item.status === newStatus) return;
+
+    if (newStatus === 'fixed' || newStatus === 'completed') {
+      setPendingStatusItemId(itemId);
+      setPendingStatusValue(newStatus);
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+      
+      // Update local state optimistically so dropdown changes visually
+      setWorkItems(prev => prev.map(w => w.id === itemId ? { ...w, status: newStatus as any } : w));
+
+      // Load builds dynamically
+      try {
+        const buildsRes = await api.getBuildsByProject(item.projectId);
+        if (buildsRes.success) {
+          setModalBuildOptions(buildsRes.data);
+          if (buildsRes.data.length > 0) {
+            setSelectedFixedBuild(buildsRes.data[0].buildNumber);
+          }
+        }
+      } catch (_) {}
+      
+      setShowFixedBuildModal(true);
+      return;
+    }
+
     // Optimistic Update: Update UI instantly
     const updatedWorkItems = workItems.map(w => 
       w.id === itemId ? { ...w, status: newStatus as any } : w
@@ -138,7 +200,9 @@ export default function Projects() {
     setWorkItems(updatedWorkItems);
 
     try {
-      const res = await api.updateWorkItemStatus(itemId, newStatus);
+      const res = await api.updateWorkItemStatus(itemId, {
+        status: newStatus
+      });
       if (res.success) {
         toast.success('Task status updated!');
       } else {
@@ -151,8 +215,68 @@ export default function Projects() {
     }
   };
 
+  const handleConfirmFixedBuild = async () => {
+    if (!selectedProject || !pendingStatusItemId || !pendingStatusValue) return;
+    const itemId = pendingStatusItemId;
+    const newStatus = pendingStatusValue;
+    // Custom typed value takes priority over dropdown selection
+    const fixedBuildVal = (customFixedBuild.trim() || selectedFixedBuild.trim()) || undefined;
+
+    setShowFixedBuildModal(false);
+
+    // Optimistic Update: Update UI instantly including fixedBuild
+    const updatedWorkItems = workItems.map(w =>
+      w.id === itemId ? { ...w, status: newStatus as any, fixedBuild: fixedBuildVal || w.fixedBuild } : w
+    );
+    setWorkItems(updatedWorkItems);
+
+    try {
+      const res = await api.updateWorkItemStatus(itemId, {
+        status: newStatus,
+        fixedBuild: fixedBuildVal
+      });
+      if (res.success) {
+        toast.success('Task status updated!');
+        // Refresh to get accurate data from server
+        fetchWorkItems(selectedProject.id);
+      } else {
+        toast.error(res.message || 'Failed to update task status');
+        fetchWorkItems(selectedProject.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating task status');
+      fetchWorkItems(selectedProject.id);
+    } finally {
+      setPendingStatusItemId(null);
+      setPendingStatusValue('');
+      setSelectedFixedBuild('');
+      setCustomFixedBuild('');
+      setModalBuildOptions([]);
+    }
+  };
+
+  const handleCancelFixedBuild = () => {
+    setShowFixedBuildModal(false);
+    if (selectedProject) {
+      fetchWorkItems(selectedProject.id);
+    }
+    setPendingStatusItemId(null);
+    setPendingStatusValue('');
+    setSelectedFixedBuild('');
+    setCustomFixedBuild('');
+    setModalBuildOptions([]);
+  };
+
   // Pagination State
-  const [projectPage, setProjectPage] = useState(1);
+  const [projectPage, setProjectPage] = useState(() => {
+    const saved = sessionStorage.getItem('projectPage');
+    return saved ? Number(saved) : 1;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('projectPage', String(projectPage));
+  }, [projectPage]);
+
   const [workItemPage, setWorkItemPage] = useState(1);
   const PROJECTS_PER_PAGE = 10;
   const WORK_ITEMS_PER_PAGE = 10;
@@ -187,7 +311,7 @@ export default function Projects() {
   // Client, Product, Module states
   const [clients, setClients] = useState<ClientDto[]>([]);
   const [showHierarchyManager, setShowHierarchyManager] = useState(false);
-  const [hierarchyTab, setHierarchyTab] = useState<'clients' | 'products' | 'modules' | 'builds'>('clients');
+  const [hierarchyTab, setHierarchyTab] = useState<'clients' | 'modules' | 'builds'>('clients');
 
   // Build states
   const [builds, setBuilds] = useState<SoftwareBuildDto[]>([]);
@@ -234,6 +358,10 @@ export default function Projects() {
   const [selectedProductIdForCreation, setSelectedProductIdForCreation] = useState<number | ''>('');
   const [modulesForCreation, setModulesForCreation] = useState<ModuleDto[]>([]);
   const [selectedModuleIdForCreation, setSelectedModuleIdForCreation] = useState<number | ''>('');
+  const [selectedClientIdForCreation, setSelectedClientIdForCreation] = useState<number | ''>('');
+  const [buildsForCreation, setBuildsForCreation] = useState<SoftwareBuildDto[]>([]);
+  const [raisedBuildForCreation, setRaisedBuildForCreation] = useState('');
+  const [fixedBuildForCreation, setFixedBuildForCreation] = useState('');
 
   // Project Client creation selection
   const [selectedClientIdForProject, setSelectedClientIdForProject] = useState<number | ''>('');
@@ -243,6 +371,8 @@ export default function Projects() {
   const [newWorkDesc, setNewWorkDesc] = useState('');
   const [newWorkPriority, setNewWorkPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
   const [newWorkAssignedId, setNewWorkAssignedId] = useState<number | ''>('');
+  const [newWorkRaisedBuild, setNewWorkRaisedBuild] = useState('');
+  const [newWorkFixedBuild, setNewWorkFixedBuild] = useState('');
   const [employees, setEmployees] = useState<EmployeeDropdownDto[]>([]);
   const [creatingWorkItem, setCreatingWorkItem] = useState(false);
   const [workTitleError, setWorkTitleError] = useState('');
@@ -255,6 +385,12 @@ export default function Projects() {
 
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<ProjectDto | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
+
+  // Custom Confirm Modal (replaces window.confirm)
+  const [customConfirm, setCustomConfirm] = useState<{ message: string; subtext?: string; onConfirm: () => void } | null>(null);
+  const showConfirm = (message: string, subtext: string, onConfirm: () => void) => {
+    setCustomConfirm({ message, subtext, onConfirm });
+  };
 
   // Edit Project Details State
   const [showEditProject, setShowEditProject] = useState(false);
@@ -766,69 +902,165 @@ export default function Projects() {
   };
 
   const handleDeleteBuild = async (buildId: number) => {
-    if (!window.confirm('Are you sure you want to delete this build?')) return;
-    try {
-      const res = await api.deleteBuild(buildId);
-      if (res.success) {
-        setBuilds(builds.filter(b => b.id !== buildId));
-        toast.success('Build deleted successfully!');
-      } else {
-        toast.error(res.message);
+    showConfirm(
+      'Delete Build?',
+      'Are you sure you want to delete this build?',
+      async () => {
+        try {
+          const res = await api.deleteBuild(buildId);
+          if (res.success) {
+            setBuilds(builds.filter(b => b.id !== buildId));
+            toast.success('Build deleted successfully!');
+          } else { toast.error(res.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete build'); }
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete build');
-    }
+    );
   };
 
   const handleDeleteClient = async (clientId: number) => {
-    if (!window.confirm('Are you sure you want to delete this client? This will set Client to None on associated projects.')) return;
-    try {
-      const res = await api.deleteClient(clientId);
-      if (res.success) {
-        setClients(clients.filter(c => c.id !== clientId));
-        toast.success('Client deleted successfully!');
-        fetchProjects();
-      } else {
-        toast.error(res.message);
+    showConfirm(
+      'Delete Client?',
+      'This will set Client to None on associated projects.',
+      async () => {
+        try {
+          const res = await api.deleteClient(clientId);
+          if (res.success) {
+            setClients(clients.filter(c => c.id !== clientId));
+            toast.success('Client deleted successfully!');
+            fetchProjects();
+          } else { toast.error(res.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete client'); }
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete client');
-    }
+    );
   };
 
   const handleDeleteProduct = async (productId: number) => {
-    if (!window.confirm('Are you sure you want to delete this product? This will cascade delete modules and set Product to None on associated items.')) return;
-    try {
-      const res = await api.deleteProduct(productId);
-      if (res.success) {
-        setProducts(products.filter(p => p.id !== productId));
-        toast.success('Product deleted successfully!');
-        if (selectedProjectIdForProduct) {
-          fetchProducts(Number(selectedProjectIdForProduct));
-        }
-      } else {
-        toast.error(res.message);
+    showConfirm(
+      'Delete Product?',
+      'This will cascade delete all modules and set Product to None on associated tasks.',
+      async () => {
+        try {
+          const res = await api.deleteProduct(productId);
+          if (res.success) {
+            setProducts(products.filter(p => p.id !== productId));
+            toast.success('Product deleted successfully!');
+            if (selectedProjectIdForProduct) fetchProducts(Number(selectedProjectIdForProduct));
+          } else { toast.error(res.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete product'); }
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete product');
-    }
+    );
   };
 
   const handleDeleteModule = async (moduleId: number) => {
-    if (!window.confirm('Are you sure you want to delete this module? This will set Module to None on associated tasks.')) return;
+    showConfirm(
+      'Delete Module?',
+      'This will set Module to None on all associated tasks.',
+      async () => {
+        try {
+          const res = await api.deleteModule(moduleId);
+          if (res.success) {
+            setModules(modules.filter(m => m.id !== moduleId));
+            toast.success('Module deleted successfully!');
+            if (selectedProductIdForModule) fetchModules(Number(selectedProductIdForModule));
+          } else { toast.error(res.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete module'); }
+      }
+    );
+  };
+
+  const handleDeleteTaskFromList = async (workItemId: number) => {
+    showConfirm(
+      'Delete Task?',
+      'This action cannot be undone. The task will be permanently removed.',
+      async () => {
+        try {
+          const res = await api.deleteWorkItem(workItemId);
+          if (res.success) {
+            toast.success('Task deleted successfully!');
+            if (selectedProject) fetchWorkItems(selectedProject.id);
+          } else { toast.error(res.message); }
+        } catch (err: any) { toast.error(err.message || 'Failed to delete task'); }
+      }
+    );
+  };
+
+  // ==================== EDIT TASK ====================
+  const [showEditTask, setShowEditTask] = useState(false);
+  const [editingWorkItem, setEditingWorkItem] = useState<WorkItemDto | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDesc, setEditTaskDesc] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [editTaskAssignedId, setEditTaskAssignedId] = useState<number | ''>('');
+  const [editTaskStatus, setEditTaskStatus] = useState('');
+  const [editTaskDueDate, setEditTaskDueDate] = useState('');
+  const [editTaskLabels, setEditTaskLabels] = useState('');
+  const [editTaskTeam, setEditTaskTeam] = useState('');
+  const [editTaskRaisedBuild, setEditTaskRaisedBuild] = useState('');
+  const [editTaskFixedBuild, setEditTaskFixedBuild] = useState('');
+  const [editTaskSeverity, setEditTaskSeverity] = useState('');
+  const [editTaskIssueType, setEditTaskIssueType] = useState('');
+  const [savingEditTask, setSavingEditTask] = useState(false);
+  const [editBuildsOptions, setEditBuildsOptions] = useState<{ buildNumber: string }[]>([]);
+
+  const handleOpenEditTask = async (item: WorkItemDto) => {
+    setEditingWorkItem(item);
+    setEditTaskTitle(item.title || '');
+    setEditTaskDesc(item.description || '');
+    setEditTaskPriority((item.priority as any) || 'medium');
+    setEditTaskAssignedId(item.assignedToUserId || '');
+    setEditTaskStatus(item.status || '');
+    setEditTaskDueDate(item.dueDate ? item.dueDate.substring(0, 10) : '');
+    setEditTaskLabels(item.labels || '');
+    setEditTaskTeam(item.team || '');
+    setEditTaskRaisedBuild(item.raisedBuild || '');
+    setEditTaskFixedBuild(item.fixedBuild || '');
+    setEditTaskSeverity(item.severity || '3');
+    setEditTaskIssueType(item.issueType || 'New');
+    // Load build options for this project
     try {
-      const res = await api.deleteModule(moduleId);
+      const buildsRes = await api.getBuildsByProject(item.projectId);
+      if (buildsRes.success) setEditBuildsOptions(buildsRes.data);
+    } catch (_) {}
+    setShowEditTask(true);
+  };
+
+  const handleSaveEditTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWorkItem || !selectedProject) return;
+    if (!editTaskTitle.trim()) { toast.error('Title is required'); return; }
+    setSavingEditTask(true);
+    try {
+      const res = await api.updateWorkItem(editingWorkItem.id, {
+        title: editTaskTitle.trim(),
+        description: editTaskDesc.trim() || null,
+        priority: editTaskPriority,
+        assignedToUserId: editTaskAssignedId === '' ? null : Number(editTaskAssignedId),
+        status: editTaskStatus || undefined,
+        dueDate: editTaskDueDate || null,
+        labels: editTaskLabels || null,
+        team: editTaskTeam || null,
+        raisedBuild: editTaskRaisedBuild.trim() || null,
+        fixedBuild: editTaskFixedBuild.trim() || null,
+        severity: editTaskSeverity || null,
+        issueType: editTaskIssueType || null,
+        workType: editingWorkItem.workType,
+        parentId: editingWorkItem.parentId || null,
+        epicName: editingWorkItem.epicName || null,
+        epicColor: editingWorkItem.epicColor || null,
+        attachmentUrls: editingWorkItem.attachmentUrls || null,
+        moduleId: editingWorkItem.moduleId || null,
+      });
       if (res.success) {
-        setModules(modules.filter(m => m.id !== moduleId));
-        toast.success('Module deleted successfully!');
-        if (selectedProductIdForModule) {
-          fetchModules(Number(selectedProductIdForModule));
-        }
+        toast.success('Task updated successfully!');
+        setShowEditTask(false);
+        fetchWorkItems(selectedProject.id);
       } else {
-        toast.error(res.message);
+        toast.error(res.message || 'Failed to update task');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete module');
+      toast.error(err.message || 'Failed to update task');
+    } finally {
+      setSavingEditTask(false);
     }
   };
 
@@ -907,6 +1139,10 @@ export default function Projects() {
     fetchAllProjects();
   }, []);
 
+  // Debounce search text so we don't fire an API call on every keystroke
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+  const debouncedWorkItemSearchQuery = useDebounce(workItemSearchQuery, 400);
+
   // Re-fetch projects when page or search query changes (excluding initial load)
   const isFirstRenderProjects = React.useRef(true);
   useEffect(() => {
@@ -915,19 +1151,19 @@ export default function Projects() {
       return;
     }
     fetchProjects();
-  }, [projectPage, searchQuery]);
+  }, [projectPage, debouncedSearchQuery]);
 
   // Re-fetch project work items when selected project, page, status, or search query changes
   useEffect(() => {
     if (selectedProject) {
       fetchWorkItems(selectedProject.id);
     }
-  }, [selectedProject?.id, workItemPage, workItemStatusFilters, workItemSearchQuery]);
+  }, [selectedProject?.id, workItemPage, workItemStatusFilters, debouncedWorkItemSearchQuery]);
 
   // Reset page to 1 on filter changes
   useEffect(() => {
     setWorkItemPage(1);
-  }, [workItemSearchQuery, workItemStatusFilters]);
+  }, [debouncedWorkItemSearchQuery, workItemStatusFilters]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1003,7 +1239,9 @@ export default function Projects() {
         title: newWorkTitle,
         description: newWorkDesc,
         priority: newWorkPriority,
-        assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId)
+        assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId),
+        raisedBuild: newWorkRaisedBuild || null,
+        fixedBuild: newWorkFixedBuild || null
       });
 
       if (res.success) {
@@ -1014,6 +1252,8 @@ export default function Projects() {
         setNewWorkDesc('');
         setNewWorkPriority('medium');
         setNewWorkAssignedId('');
+        setNewWorkRaisedBuild('');
+        setNewWorkFixedBuild('');
         setWorkTitleError('');
         toast.success('Task created successfully!');
       }
@@ -1078,17 +1318,17 @@ export default function Projects() {
         epicName: functionalWorkType === 'Epic' ? newEpicName || newWorkTitle : null,
         epicColor: functionalWorkType === 'Epic' ? newEpicColor : null,
         severity: functionalWorkType === 'Bug' ? bugSeverity : null,
-        issueType: functionalWorkType === 'Bug' ? bugIssueType : null
+        issueType: functionalWorkType === 'Bug' ? bugIssueType : null,
+        raisedBuild: raisedBuildForCreation || null,
+        fixedBuild: fixedBuildForCreation || null
       });
 
       if (res.success) {
-        // Refresh project details if we are viewing the target project
+        // Refresh work items list — reset to page 1 so new item is visible immediately
         if (selectedProject && selectedProject.id === Number(selectedProjectIdForCreation)) {
-          await fetchProjectDetails(selectedProject.id);
+          setWorkItemPage(1);
+          fetchWorkItems(selectedProject.id);
         }
-
-        // Refresh all projects list
-        fetchProjects();
 
         toast.success('Work item created successfully!');
 
@@ -1113,6 +1353,9 @@ export default function Projects() {
           setFunctionalParentId('');
           setFunctionalLabel('');
           setFunctionalTeam('');
+          setRaisedBuildForCreation('');
+          setFixedBuildForCreation('');
+          setSelectedClientIdForCreation('');
           setUploadedAttachmentUrls([]);
           setWorkTitleError('');
           setProjectSelectError('');
@@ -1404,9 +1647,26 @@ export default function Projects() {
                 <Download size={18} />
                 Export Project (CSV)
               </button>
-              <button className="btn btn-primary" onClick={() => {
+              <button className="btn btn-primary" onClick={async () => {
+                // Set project selection
                 setSelectedProjectIdForCreation(selectedProject.id);
                 setCreateAnother(false);
+                // Pre-fetch builds, products, and modules immediately
+                try {
+                  const [buildsRes, prodRes] = await Promise.all([
+                    api.getBuildsByProject(selectedProject.id),
+                    api.getProducts(selectedProject.id)
+                  ]);
+                  if (buildsRes.success) setBuildsForCreation(buildsRes.data);
+                  if (prodRes.success && prodRes.data.length > 0) {
+                    setSelectedProductIdForCreation(prodRes.data[0].id);
+                    const modRes = await api.getModules(prodRes.data[0].id);
+                    if (modRes.success) setModulesForCreation(modRes.data);
+                  } else {
+                    setProductsForCreation([]);
+                    setModulesForCreation([]);
+                  }
+                } catch (_) {}
                 setShowCreateFunctional(true);
               }} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <PlusCircle size={16} />
@@ -1789,15 +2049,26 @@ export default function Projects() {
                         <th>Priority</th>
                         <th>Status</th>
                         <th>Resolution</th>
+                        <th style={{ textAlign: 'center' }}>Raised Build</th>
+                        <th style={{ textAlign: 'center' }}>Fixed Build</th>
                         <th>Created</th>
                         <th>Updated</th>
                         <th>Due Date</th>
+                        <th style={{ width: '130px', textAlign: 'center' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedWorkItems.map((item) => {
-                        const isCompleted = item.status === 'completed' || item.status === 'closed' || item.status === 'fixed';
-                        const resolution = isCompleted ? 'Resolved' : 'Unresolved';
+                        const resolution =
+                          item.status === 'fixed' ? 'FIXED' :
+                          item.status === 'completed' ? 'RESOLVED' :
+                          item.status === 'closed' ? 'CLOSED' :
+                          'Unresolved';
+                        const resolutionColor =
+                          item.status === 'fixed' ? '#34d399' :
+                          item.status === 'completed' ? '#10B981' :
+                          item.status === 'closed' ? '#6B7280' :
+                          '#6B7280';
                         return (
                           <tr key={`task-${item.id}`}>
                             <td><input type="checkbox" /></td>
@@ -1817,7 +2088,12 @@ export default function Projects() {
                                   >
                                     {item.workNumber}
                                   </a>
-                                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                                  <span 
+                                    onClick={() => navigate(`/workitems/${item.id}`)}
+                                    style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                                  >
                                     {item.title}
                                   </span>
                                 </div>
@@ -1862,16 +2138,92 @@ export default function Projects() {
                             </td>
                             <td>
                               <span style={{
-                                color: isCompleted ? '#10B981' : '#6B7280',
-                                fontWeight: 600,
-                                fontSize: '0.85rem'
+                                color: resolutionColor,
+                                fontWeight: 700,
+                                fontSize: '0.82rem',
+                                letterSpacing: '0.04em'
                               }}>
                                 {resolution}
                               </span>
                             </td>
+                            <td style={{ textAlign: 'center' }}>
+                              {item.raisedBuild ? (
+                                <span style={{
+                                  display: 'inline-block',
+                                  background: 'rgba(251,146,60,0.12)',
+                                  color: '#fb923c',
+                                  border: '1px solid rgba(251,146,60,0.3)',
+                                  borderRadius: '6px',
+                                  padding: '3px 10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  letterSpacing: '0.03em',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {item.raisedBuild}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              {item.fixedBuild ? (
+                                <span style={{
+                                  display: 'inline-block',
+                                  background: 'rgba(52,211,153,0.12)',
+                                  color: '#34d399',
+                                  border: '1px solid rgba(52,211,153,0.3)',
+                                  borderRadius: '6px',
+                                  padding: '3px 10px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  letterSpacing: '0.03em',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {item.fixedBuild}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
+                              )}
+                            </td>
                             <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                             <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                             <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  onClick={() => navigate(`/workitems/${item.id}`)}
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="View details"
+                                >
+                                  View
+                                </button>
+                                {item.createdByUserId === user?.userId && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      onClick={() => handleOpenEditTask(item)}
+                                      style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      title="Edit task"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger"
+                                      onClick={() => handleDeleteTaskFromList(item.id)}
+                                      style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      title="Delete task"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -2098,9 +2450,42 @@ export default function Projects() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Space (Project selection) */}
+              {/* Client Selection */}
               <div className="form-group">
-                <label htmlFor="funcSpace">Space <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <label htmlFor="funcClient">Client</label>
+                <select
+                  id="funcClient"
+                  className="form-select"
+                  value={selectedClientIdForCreation}
+                  onChange={(e) => {
+                    const clientVal = e.target.value === '' ? '' : Number(e.target.value);
+                    setSelectedClientIdForCreation(clientVal);
+                    // Reset project and modules if they don't match
+                    if (clientVal) {
+                      const selectedProj = allProjects.find(p => p.id === selectedProjectIdForCreation);
+                      if (selectedProj && selectedProj.clientId !== clientVal) {
+                        setSelectedProjectIdForCreation('');
+                        setSelectedProductIdForCreation('');
+                        setSelectedModuleIdForCreation('');
+                        setProductsForCreation([]);
+                        setModulesForCreation([]);
+                        setBuildsForCreation([]);
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Select Client...</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Space / Project / Product selection */}
+              <div className="form-group">
+                <label htmlFor="funcSpace">Space/ Project/ Product <span style={{ color: 'var(--danger)' }}>*</span></label>
                 <select
                   id="funcSpace"
                   className="form-select"
@@ -2112,24 +2497,48 @@ export default function Projects() {
                     setSelectedModuleIdForCreation('');
                     setProductsForCreation([]);
                     setModulesForCreation([]);
+                    setBuildsForCreation([]);
+                    
                     if (projIdVal) {
                       setProjectSelectError('');
+                      // Auto-select Client
+                      const proj = allProjects.find(p => p.id === projIdVal);
+                      if (proj && proj.clientId) {
+                        setSelectedClientIdForCreation(proj.clientId);
+                      }
+                      
                       try {
+                        // Fetch Project builds
+                        const buildsRes = await api.getBuildsByProject(projIdVal);
+                        if (buildsRes.success) {
+                          setBuildsForCreation(buildsRes.data);
+                        }
+                        
+                        // Fetch Project Products
                         const prodRes = await api.getProducts(projIdVal);
-                        if (prodRes.success) {
-                          setProductsForCreation(prodRes.data);
+                        if (prodRes.success && prodRes.data.length > 0) {
+                          const firstProd = prodRes.data[0];
+                          setSelectedProductIdForCreation(firstProd.id);
+                          
+                          // Load modules for this first product directly
+                          const modRes = await api.getModules(firstProd.id);
+                          if (modRes.success) {
+                            setModulesForCreation(modRes.data);
+                          }
                         }
                       } catch (err) {}
                     }
                   }}
                   style={projectSelectError ? { borderColor: 'var(--danger)', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.2)' } : {}}
                 >
-                  <option value="">Select Space/Project...</option>
-                  {allProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.projectNumber})
-                    </option>
-                  ))}
+                  <option value="">Select Space/Project/Product...</option>
+                  {allProjects
+                    .filter(p => !selectedClientIdForCreation || p.clientId === selectedClientIdForCreation)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.projectNumber})
+                      </option>
+                    ))}
                 </select>
                 {projectSelectError && (
                   <div style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 500, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2139,64 +2548,29 @@ export default function Projects() {
                 )}
               </div>
 
-              {/* Product and Module Cascading Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Product Selection */}
-                <div className="form-group">
-                  <label htmlFor="funcProduct">Product</label>
-                  <select
-                    id="funcProduct"
-                    className="form-select"
-                    value={selectedProductIdForCreation}
-                    disabled={!selectedProjectIdForCreation}
-                    onChange={async (e) => {
-                      const prodIdVal = e.target.value === '' ? '' : Number(e.target.value);
-                      setSelectedProductIdForCreation(prodIdVal);
-                      setSelectedModuleIdForCreation('');
-                      setModulesForCreation([]);
-                      if (prodIdVal) {
-                        try {
-                          const modRes = await api.getModules(prodIdVal);
-                          if (modRes.success) {
-                            setModulesForCreation(modRes.data);
-                          }
-                        } catch (err) {}
-                      }
-                    }}
-                  >
-                    <option value="">Select Product...</option>
-                    {productsForCreation.map((prd) => (
-                      <option key={prd.id} value={prd.id}>
-                        {prd.name} ({prd.productNumber})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Module Selection */}
-                <div className="form-group">
-                  <label htmlFor="funcModule">Module</label>
-                  <select
-                    id="funcModule"
-                    className="form-select"
-                    value={selectedModuleIdForCreation}
-                    disabled={!selectedProductIdForCreation}
-                    onChange={(e) => {
-                      setSelectedModuleIdForCreation(e.target.value === '' ? '' : Number(e.target.value));
-                    }}
-                  >
-                    <option value="">Select Module...</option>
-                    {modulesForCreation.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.moduleNumber})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Module selection (Product selection is hidden) */}
+              <div className="form-group">
+                <label htmlFor="funcModule">Module</label>
+                <select
+                  id="funcModule"
+                  className="form-select"
+                  value={selectedModuleIdForCreation}
+                  disabled={!selectedProjectIdForCreation}
+                  onChange={(e) => {
+                    setSelectedModuleIdForCreation(e.target.value === '' ? '' : Number(e.target.value));
+                  }}
+                >
+                  <option value="">Select Module...</option>
+                  {modulesForCreation.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.moduleNumber})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Work Type & Status Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Work Type */}
                 <div className="form-group">
                   <label htmlFor="funcWorkType">Work type <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -2263,8 +2637,46 @@ export default function Projects() {
                   >
                     <option value="New">New</option>
                     <option value="Reopen">Reopen</option>
-                    <option value="Regression">Regression</option>
                   </select>
+                </div>
+              )}
+
+              {/* Build Numbers Row (visible if project selected) */}
+              {selectedProjectIdForCreation && (
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label htmlFor="funcRaisedBuild">Raised Build Number</label>
+                    <select
+                      id="funcRaisedBuild"
+                      className="form-select"
+                      value={raisedBuildForCreation}
+                      onChange={(e) => setRaisedBuildForCreation(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {buildsForCreation.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>
+                          {b.buildNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="funcFixedBuild">Fixed Build Number</label>
+                    <select
+                      id="funcFixedBuild"
+                      className="form-select"
+                      value={fixedBuildForCreation}
+                      onChange={(e) => setFixedBuildForCreation(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {buildsForCreation.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>
+                          {b.buildNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -2334,7 +2746,7 @@ export default function Projects() {
               </div>
 
               {/* Priority + Conditional: Severity (Bug) | Epic Name+Color (Epic) | Epic Link (Others) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Priority */}
                 <div className="form-group">
                   <label htmlFor="funcPriority">Priority</label>
@@ -2361,12 +2773,11 @@ export default function Projects() {
                       value={bugSeverity}
                       onChange={(e) => setBugSeverity(e.target.value)}
                     >
-                      <option value="1">1 (Lowest)</option>
+                      <option value="1">1</option>
                       <option value="2">2</option>
                       <option value="3">3</option>
                       <option value="4">4</option>
                       <option value="5">5</option>
-                      <option value="6">6 (Highest)</option>
                     </select>
                   </div>
                 )}
@@ -2435,60 +2846,52 @@ export default function Projects() {
 
 
               {/* Due Date & Start Date Row */}
-              {functionalWorkType !== 'Bug' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  {/* Due Date */}
-                  <div className="form-group">
-                    <label htmlFor="funcDueDate">Due date</label>
-                    <input
-                      id="funcDueDate"
-                      type="date"
-                      className="form-input"
-                      value={functionalDueDate}
-                      onChange={(e) => setFunctionalDueDate(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Start Date */}
-                  <div className="form-group">
-                    <label htmlFor="funcStartDate">Start date</label>
-                    <input
-                      id="funcStartDate"
-                      type="date"
-                      className="form-input"
-                      value={functionalStartDate}
-                      onChange={(e) => setFunctionalStartDate(e.target.value)}
-                    />
-                    <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
-                      Allows the planned start date for a piece of work to be set.
-                    </span>
-                  </div>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Due Date */}
+                <div className="form-group">
+                  <label htmlFor="funcDueDate">Due date</label>
+                  <input
+                    id="funcDueDate"
+                    type="date"
+                    className="form-input"
+                    value={functionalDueDate}
+                    onChange={(e) => setFunctionalDueDate(e.target.value)}
+                  />
                 </div>
-              )}
+
+                {/* Start Date */}
+                <div className="form-group">
+                  <label htmlFor="funcStartDate">Start date</label>
+                  <input
+                    id="funcStartDate"
+                    type="date"
+                    className="form-input"
+                    value={functionalStartDate}
+                    onChange={(e) => setFunctionalStartDate(e.target.value)}
+                  />
+                  <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                    Allows the planned start date for a piece of work to be set.
+                  </span>
+                </div>
+              </div>
 
               {/* Labels & Team Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Labels */}
-                {functionalWorkType !== 'Bug' ? (
-                  <div className="form-group">
-                    <label htmlFor="funcLabels">Labels</label>
-                    <select
-                      id="funcLabels"
-                      className="form-select"
-                      value={functionalLabel}
-                      onChange={(e) => setFunctionalLabel(e.target.value)}
-                    >
-                      <option value="">Select label</option>
-                      <option value="frontend">Frontend</option>
-                      <option value="backend">Backend</option>
-                      <option value="database">Database</option>
-                      <option value="testing">Testing</option>
-                      <option value="documentation">Documentation</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div></div> /* spacing spacer */
-                )}
+                <div className="form-group">
+                  <label htmlFor="funcLabels">Label</label>
+                  <select
+                    id="funcLabels"
+                    className="form-select"
+                    value={functionalLabel}
+                    onChange={(e) => setFunctionalLabel(e.target.value)}
+                  >
+                    <option value="">Select label</option>
+                    <option value="mobileapp">Mobile App</option>
+                    <option value="webapp">Web App</option>
+                    <option value="mobileapp/webapp">Mobile/Web App</option>
+                  </select>
+                </div>
 
                 {/* Team */}
                 <div className="form-group">
@@ -2820,12 +3223,12 @@ export default function Projects() {
             </button>
             <h2 style={{ marginBottom: '6px', fontWeight: 800 }} className="gradient-text">Hierarchy Setup</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px' }}>
-              Manage Clients, Products, and Modules for your workflow hierarchy.
+              Manage Clients, Modules, and Builds for your workflow hierarchy.
             </p>
 
             {/* Tab navigation */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)', marginBottom: '24px', gap: '16px' }}>
-              {(['clients', 'products', 'modules', 'builds'] as const).map(tab => (
+              {(['clients', 'modules', 'builds'] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
@@ -2856,7 +3259,7 @@ export default function Projects() {
               <div>
                 <form onSubmit={handleCreateClient} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Client</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label htmlFor="clientName">Client Name <span style={{ color: 'var(--danger)' }}>*</span></label>
                       <input
@@ -2988,172 +3391,12 @@ export default function Projects() {
               </div>
             )}
 
-            {/* TAB CONTENT: PRODUCTS */}
-            {hierarchyTab === 'products' && (
-              <div>
-                <form onSubmit={handleCreateProduct} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
-                  <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Product</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label htmlFor="prodProject">Select Project <span style={{ color: 'var(--danger)' }}>*</span></label>
-                      <select
-                        id="prodProject"
-                        className="form-select"
-                        value={selectedProjectIdForProduct}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? '' : Number(e.target.value);
-                          setSelectedProjectIdForProduct(val);
-                          if (val) fetchProducts(val);
-                          else setProducts([]);
-                        }}
-                      >
-                        <option value="">Choose Project...</option>
-                        {allProjects.map(p => (
-                          <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label htmlFor="prodName">Product Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                      <input
-                        id="prodName"
-                        type="text"
-                        placeholder="e.g. Customer Portal App"
-                        className="form-input"
-                        value={newProductName}
-                        onChange={(e) => setNewProductName(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: '16px' }}>
-                    <label htmlFor="prodDesc">Description (Optional)</label>
-                    <input
-                      id="prodDesc"
-                      type="text"
-                      placeholder="e.g. Client-facing support app"
-                      className="form-input"
-                      value={newProductDesc}
-                      onChange={(e) => setNewProductDesc(e.target.value)}
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={creatingProduct}>
-                    {creatingProduct ? 'Adding...' : 'Add Product'}
-                  </button>
-                </form>
-
-                <h4 style={{ marginBottom: '12px', fontWeight: 700 }}>
-                  {selectedProjectIdForProduct ? `Products in this Project` : `Select a project to view products`}
-                </h4>
-                {!selectedProjectIdForProduct ? (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>Choose a project from the dropdown above to filter products.</p>
-                ) : products.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>No products registered under this project yet.</p>
-                ) : (
-                  <div className="table-container">
-                    <table className="custom-table" style={{ fontSize: '0.9rem' }}>
-                      <thead>
-                        <tr>
-                          <th>Product Code</th>
-                          <th>Name</th>
-                          <th>Description</th>
-                          <th style={{ width: '150px', textAlign: 'center' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map(p => {
-                          const isEditing = editingProductId === p.id;
-                          return (
-                            <tr key={p.id}>
-                              <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.productNumber}</td>
-                              <td>
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
-                                    value={editProductName}
-                                    onChange={(e) => setEditProductName(e.target.value)}
-                                  />
-                                ) : (
-                                  <span style={{ fontWeight: 600 }}>{p.name}</span>
-                                )}
-                              </td>
-                              <td>
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '4px 8px', fontSize: '0.9rem', height: 'auto', background: 'white' }}
-                                    value={editProductDesc}
-                                    onChange={(e) => setEditProductDesc(e.target.value)}
-                                  />
-                                ) : (
-                                  p.description || '-'
-                                )}
-                              </td>
-                              <td style={{ textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                  {isEditing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        onClick={() => handleSaveProductEdit(p.id, p.projectId)}
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                      >
-                                        Save
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => setEditingProductId(null)}
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                      >
-                                        Cancel
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => {
-                                          setEditingProductId(p.id);
-                                          setEditProductName(p.name);
-                                          setEditProductDesc(p.description || '');
-                                        }}
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                      >
-                                        <Edit size={12} /> Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-danger"
-                                        onClick={() => handleDeleteProduct(p.id)}
-                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                      >
-                                        <Trash2 size={12} /> Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* TAB CONTENT: MODULES */}
             {hierarchyTab === 'modules' && (
               <div>
                 <form onSubmit={handleCreateModule} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Module</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label htmlFor="modProject">Select Project <span style={{ color: 'var(--danger)' }}>*</span></label>
                       <select
@@ -3163,16 +3406,17 @@ export default function Projects() {
                         onChange={async (e) => {
                           const val = e.target.value === '' ? '' : Number(e.target.value);
                           setSelectedProjectIdForModule(val);
-                          setSelectedProductIdForModule('');
                           setModules([]);
                           if (val) {
                             // Load products under this project
                             try {
                               const res = await api.getProducts(val);
-                              if (res.success) setProducts(res.data);
+                              if (res.success && res.data.length > 0) {
+                                const prod = res.data[0];
+                                setSelectedProductIdForModule(prod.id);
+                                fetchModules(prod.id);
+                              }
                             } catch (_) {}
-                          } else {
-                            setProducts([]);
                           }
                         }}
                       >
@@ -3182,30 +3426,9 @@ export default function Projects() {
                         ))}
                       </select>
                     </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label htmlFor="modProduct">Select Product <span style={{ color: 'var(--danger)' }}>*</span></label>
-                      <select
-                        id="modProduct"
-                        className="form-select"
-                        value={selectedProductIdForModule}
-                        disabled={!selectedProjectIdForModule}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? '' : Number(e.target.value);
-                          setSelectedProductIdForModule(val);
-                          if (val) fetchModules(val);
-                          else setModules([]);
-                        }}
-                      >
-                        <option value="">Choose Product...</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>{p.name} ({p.productNumber})</option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label htmlFor="modName">Module Name <span style={{ color: 'var(--danger)' }}>*</span></label>
                       <input
@@ -3236,12 +3459,12 @@ export default function Projects() {
                 </form>
 
                 <h4 style={{ marginBottom: '12px', fontWeight: 700 }}>
-                  {selectedProductIdForModule ? `Modules in this Product` : `Select project & product to view modules`}
+                  {selectedProductIdForModule ? `Modules in this Project` : `Select project to view modules`}
                 </h4>
                 {!selectedProductIdForModule ? (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>Choose project and product from dropdowns above to filter modules.</p>
+                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>Choose project from dropdown above to filter modules.</p>
                 ) : modules.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>No modules registered under this product yet.</p>
+                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.9rem' }}>No modules registered under this project yet.</p>
                 ) : (
                   <div className="table-container">
                     <table className="custom-table" style={{ fontSize: '0.9rem' }}>
@@ -3347,7 +3570,7 @@ export default function Projects() {
               <div>
                 <form onSubmit={handleCreateBuild} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Software Build</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label htmlFor="buildProject">Select Project <span style={{ color: 'var(--danger)' }}>*</span></label>
                       <select
@@ -3495,6 +3718,259 @@ export default function Projects() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TASK MODAL */}
+      {showEditTask && editingWorkItem && (
+        <div className="modal-overlay" onClick={() => setShowEditTask(false)}>
+          <div
+            className="modal-content glass-panel"
+            style={{ maxWidth: '620px', width: '96%', padding: '0', borderRadius: '16px', overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.06))', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>Edit Task</h3>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>{editingWorkItem.workNumber} · {editingWorkItem.workType}</div>
+              </div>
+              <button className="modal-close" onClick={() => setShowEditTask(false)}><X size={20} /></button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEditTask} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '75vh', overflowY: 'auto' }}>
+
+              {/* Title */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  className="form-input"
+                  value={editTaskTitle}
+                  onChange={e => setEditTaskTitle(e.target.value)}
+                  placeholder="Task title"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</label>
+                <textarea
+                  className="form-input"
+                  value={editTaskDesc}
+                  onChange={e => setEditTaskDesc(e.target.value)}
+                  placeholder="Task description"
+                  rows={3}
+                  style={{ resize: 'vertical', minHeight: '72px' }}
+                />
+              </div>
+
+              {/* Priority + Status */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</label>
+                  <select className="form-select" value={editTaskPriority} onChange={e => setEditTaskPriority(e.target.value as any)}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</label>
+                  <select className="form-select" value={editTaskStatus} onChange={e => setEditTaskStatus(e.target.value)}>
+                    <option value="pending">Pending</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="closed">Closed</option>
+                    <option value="reopened">Reopened</option>
+                    <option value="future_release">Future Release</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Assigned To + Due Date */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assigned To</label>
+                  <select className="form-select" value={editTaskAssignedId} onChange={e => setEditTaskAssignedId(e.target.value === '' ? '' : Number(e.target.value))}>
+                    <option value="">-- Unassigned --</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due Date</label>
+                  <input type="date" className="form-input" value={editTaskDueDate} onChange={e => setEditTaskDueDate(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Labels + Team */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Labels</label>
+                  <input className="form-input" value={editTaskLabels} onChange={e => setEditTaskLabels(e.target.value)} placeholder="e.g. frontend, api" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Team</label>
+                  <input className="form-input" value={editTaskTeam} onChange={e => setEditTaskTeam(e.target.value)} placeholder="e.g. Backend Team" />
+                </div>
+              </div>
+
+              {/* Bug-specific fields */}
+              {editingWorkItem.workType === 'Bug' && (
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Severity</label>
+                    <select className="form-select" value={editTaskSeverity} onChange={e => setEditTaskSeverity(e.target.value)}>
+                      <option value="1">1 - Critical</option>
+                      <option value="2">2 - High</option>
+                      <option value="3">3 - Medium</option>
+                      <option value="4">4 - Low</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Issue Type</label>
+                    <select className="form-select" value={editTaskIssueType} onChange={e => setEditTaskIssueType(e.target.value)}>
+                      <option value="New">New</option>
+                      <option value="Reopened">Reopened</option>
+                      <option value="Enhancement">Enhancement</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Raised Build */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fb923c' }}>Raised Build Number</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    value={editBuildsOptions.some(b => b.buildNumber === editTaskRaisedBuild) ? editTaskRaisedBuild : ''}
+                    onChange={e => { if (e.target.value) setEditTaskRaisedBuild(e.target.value); }}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">-- Select Build --</option>
+                    {editBuildsOptions.map(b => (
+                      <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="form-input"
+                    value={editTaskRaisedBuild}
+                    onChange={e => setEditTaskRaisedBuild(e.target.value)}
+                    placeholder="or type custom"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                {editTaskRaisedBuild && (
+                  <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#fb923c' }}>🟠 {editTaskRaisedBuild}</div>
+                )}
+              </div>
+
+              {/* Fixed Build */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#34d399' }}>Fixed Build Number</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    value={editBuildsOptions.some(b => b.buildNumber === editTaskFixedBuild) ? editTaskFixedBuild : ''}
+                    onChange={e => { if (e.target.value) setEditTaskFixedBuild(e.target.value); }}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">-- Select Build --</option>
+                    {editBuildsOptions.map(b => (
+                      <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="form-input"
+                    value={editTaskFixedBuild}
+                    onChange={e => setEditTaskFixedBuild(e.target.value)}
+                    placeholder="or type custom"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                {editTaskFixedBuild && (
+                  <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#34d399' }}>🟢 {editTaskFixedBuild}</div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditTask(false)} disabled={savingEditTask}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={savingEditTask} style={{ minWidth: '100px' }}>
+                  {savingEditTask ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Fixed Build Modal */}
+      {showFixedBuildModal && (
+        <div className="modal-overlay" onClick={handleCancelFixedBuild}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Select Fixed Build</h3>
+              <button className="modal-close" onClick={handleCancelFixedBuild}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fb923c', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Fixed Build Number</label>
+                <select
+                  className="form-select"
+                  value={selectedFixedBuild}
+                  onChange={e => {
+                    setSelectedFixedBuild(e.target.value);
+                    setCustomFixedBuild(''); // clear custom when dropdown selected
+                  }}
+                >
+                  <option value="">-- Select Build Number --</option>
+                  {modalBuildOptions.map(b => (
+                    <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', margin: '4px 0' }}>— OR —</div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Enter Custom Build Number</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Emed 1.01"
+                  value={customFixedBuild}
+                  onChange={e => {
+                    setCustomFixedBuild(e.target.value);
+                    setSelectedFixedBuild(''); // clear dropdown when typing custom
+                  }}
+                />
+                {customFixedBuild.trim() && (
+                  <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>✓</span> Will save as: <strong>{customFixedBuild.trim()}</strong>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmFixedBuild}
+                  disabled={!selectedFixedBuild && !customFixedBuild.trim()}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -3658,7 +4134,7 @@ export default function Projects() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
                 <div className="form-group">
                   <label htmlFor="workPriority">Priority</label>
                   <select
@@ -3692,6 +4168,41 @@ export default function Projects() {
                 </div>
               </div>
 
+              {/* Build Numbers */}
+              {builds.length > 0 && (
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="newWorkRaisedBuild">Raised Build Number</label>
+                    <select
+                      id="newWorkRaisedBuild"
+                      className="form-select"
+                      value={newWorkRaisedBuild}
+                      onChange={(e) => setNewWorkRaisedBuild(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {builds.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>{b.buildNumber}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="newWorkFixedBuild">Fixed Build Number</label>
+                    <select
+                      id="newWorkFixedBuild"
+                      className="form-select"
+                      value={newWorkFixedBuild}
+                      onChange={(e) => setNewWorkFixedBuild(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {builds.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>{b.buildNumber}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateWorkItem(false)}>
                   Cancel
@@ -3704,6 +4215,7 @@ export default function Projects() {
           </div>
         </div>
       )}
+
 
       {/* DELETE PROJECT CONFIRM MODAL */}
       {confirmDeleteProject && (
@@ -3869,7 +4381,7 @@ export default function Projects() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
                 <div className="form-group">
                   <label htmlFor="editProjStatus">Status</label>
                   <select
@@ -3911,6 +4423,101 @@ export default function Projects() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* CUSTOM CONFIRM MODAL */}
+      {customConfirm && createPortal(
+        <div
+          onClick={() => setCustomConfirm(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(6, 6, 18, 0.75)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            animation: 'fadeIn 0.15s ease'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '92%',
+              maxWidth: '400px',
+              background: 'linear-gradient(145deg, rgba(20,20,40,0.98), rgba(15,15,30,0.99))',
+              border: '1px solid rgba(239,68,68,0.3)',
+              borderLeft: '4px solid #ef4444',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+              animation: 'slideUpFade 0.2s cubic-bezier(0.16,1,0.3,1)'
+            }}
+          >
+            {/* Body */}
+            <div style={{ padding: '28px 28px 24px', display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+              {/* Icon */}
+              <div style={{
+                width: '46px', height: '46px', borderRadius: '12px',
+                background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                </svg>
+              </div>
+              {/* Text */}
+              <div style={{ paddingTop: '2px' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.08rem', color: '#f1f5f9', marginBottom: '8px', letterSpacing: '-0.01em' }}>
+                  {customConfirm.message}
+                </div>
+                {customConfirm.subtext && (
+                  <div style={{ fontSize: '0.85rem', color: 'rgba(148,163,184,0.85)', lineHeight: 1.6 }}>
+                    {customConfirm.subtext}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0 28px' }} />
+
+            {/* Buttons */}
+            <div style={{ padding: '20px 28px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setCustomConfirm(null)}
+                style={{
+                  padding: '9px 18px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(203,213,225,0.9)',
+                  fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const cb = customConfirm.onConfirm; setCustomConfirm(null); cb(); }}
+                style={{
+                  padding: '9px 22px', borderRadius: '8px', border: 'none',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#fff', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(239,68,68,0.4)',
+                  transition: 'all 0.15s ease',
+                  letterSpacing: '0.01em'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 20px rgba(239,68,68,0.55)')}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(239,68,68,0.4)')}
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>,
         document.body

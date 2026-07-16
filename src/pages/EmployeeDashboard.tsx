@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { toast } from '../services/toast';
+import { useDebounce } from '../hooks/useDebounce';
 import { 
   CheckSquare, 
   Bug, 
@@ -77,6 +78,13 @@ export default function EmployeeDashboard() {
   const [newEpicName, setNewEpicName] = useState('');
   const [newEpicColor, setNewEpicColor] = useState('purple');
   const [submissionType, setSubmissionType] = useState<'standard' | 'another' | 'copy'>('standard');
+
+  // Fixed Build Modal State
+  const [showFixedBuildModal, setShowFixedBuildModal] = useState(false);
+  const [pendingStatusItemId, setPendingStatusItemId] = useState<number | null>(null);
+  const [pendingStatusValue, setPendingStatusValue] = useState('');
+  const [selectedFixedBuild, setSelectedFixedBuild] = useState('');
+  const [modalBuildOptions, setModalBuildOptions] = useState<{ buildNumber: string }[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -203,8 +211,37 @@ export default function EmployeeDashboard() {
   };
 
   const handleUpdateTaskStatus = async (taskId: number, newStatus: string) => {
+    const item = tasks.find(t => t.id === taskId);
+    if (!item || item.status === newStatus) return;
+
+    if (newStatus === 'fixed' || newStatus === 'completed') {
+      setPendingStatusItemId(taskId);
+      setPendingStatusValue(newStatus);
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+      
+      // Update local state optimistically so dropdown changes visually
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
+
+      // Load builds dynamically
+      try {
+        const buildsRes = await api.getBuildsByProject(item.projectId);
+        if (buildsRes.success) {
+          setModalBuildOptions(buildsRes.data);
+          if (buildsRes.data.length > 0) {
+            setSelectedFixedBuild(buildsRes.data[0].buildNumber);
+          }
+        }
+      } catch (_) {}
+      
+      setShowFixedBuildModal(true);
+      return;
+    }
+
     try {
-      const res = await api.updateWorkItemStatus(taskId, newStatus);
+      const res = await api.updateWorkItemStatus(taskId, {
+        status: newStatus
+      });
       if (res.success) {
         toast.success('Task status updated successfully!');
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
@@ -214,6 +251,46 @@ export default function EmployeeDashboard() {
     } catch (err: any) {
       toast.error(err.message || 'Error updating status');
     }
+  };
+
+  const handleConfirmFixedBuild = async () => {
+    if (!pendingStatusItemId || !pendingStatusValue) return;
+    const taskId = pendingStatusItemId;
+    const newStatus = pendingStatusValue;
+    const fixedBuildVal = selectedFixedBuild || undefined;
+
+    setShowFixedBuildModal(false);
+
+    try {
+      const res = await api.updateWorkItemStatus(taskId, {
+        status: newStatus,
+        fixedBuild: fixedBuildVal
+      });
+      if (res.success) {
+        toast.success('Task status updated successfully!');
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as any } : t));
+      } else {
+        toast.error(res.message || 'Failed to update status');
+        fetchTasks();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating status');
+      fetchTasks();
+    } finally {
+      setPendingStatusItemId(null);
+      setPendingStatusValue('');
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+    }
+  };
+
+  const handleCancelFixedBuild = () => {
+    setShowFixedBuildModal(false);
+    fetchTasks();
+    setPendingStatusItemId(null);
+    setPendingStatusValue('');
+    setSelectedFixedBuild('');
+    setModalBuildOptions([]);
   };
 
   const handleUpdateBugStatus = async (bugId: number, newStatus: string) => {
@@ -308,6 +385,7 @@ export default function EmployeeDashboard() {
         dueDate: dateFilter || undefined,
         search: searchQuery || undefined,
         workType: workTypeFilter !== 'all' ? workTypeFilter : undefined,
+        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
       });
       if (res.success) {
         setTasks(res.data.items);
@@ -321,17 +399,20 @@ export default function EmployeeDashboard() {
     }
   };
 
+  // Debounce search text so we don't fire an API call on every keystroke
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+
   // Reset page to 1 when task filters change
   useEffect(() => {
     setTaskPage(1);
-  }, [searchQuery, statusFilters, dateFilter, workTypeFilter]);
+  }, [debouncedSearchQuery, statusFilters, dateFilter, workTypeFilter, priorityFilter]);
 
   // Re-fetch tasks when page or filters change (but skip initial mount — fetchData handles it)
   const isFirstRender = React.useRef(true);
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     fetchTasks();
-  }, [taskPage, searchQuery, statusFilters, dateFilter, workTypeFilter]);
+  }, [taskPage, debouncedSearchQuery, statusFilters, dateFilter, workTypeFilter, priorityFilter]);
 
   if (loading) {
     return (
@@ -650,6 +731,7 @@ export default function EmployeeDashboard() {
                       <th>Priority</th>
                       <th>Status</th>
                       <th>Resolution</th>
+                      <th>Build Info</th>
                       <th>Created</th>
                       <th>Updated</th>
                       <th>Due Date</th>
@@ -727,6 +809,21 @@ export default function EmployeeDashboard() {
                               {resolution}
                             </span>
                           </td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.8rem' }}>
+                              {item.raisedBuild && (
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                  <strong style={{ color: '#fb923c' }}>R:</strong> {item.raisedBuild}
+                                </span>
+                              )}
+                              {item.fixedBuild && (
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                  <strong style={{ color: '#34d399' }}>F:</strong> {item.fixedBuild}
+                                </span>
+                              )}
+                              {!item.raisedBuild && !item.fixedBuild && <span>—</span>}
+                            </div>
+                          </td>
                           <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                           <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                           <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
@@ -794,6 +891,7 @@ export default function EmployeeDashboard() {
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Resolution</th>
+                    <th>Build Info</th>
                     <th>Created</th>
                     <th>Updated</th>
                     <th>Due Date</th>
@@ -853,6 +951,21 @@ export default function EmployeeDashboard() {
                             {resolution}
                           </span>
                         </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '0.8rem' }}>
+                            {item.raisedBuild && (
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                <strong style={{ color: '#fb923c' }}>R:</strong> {item.raisedBuild}
+                              </span>
+                            )}
+                            {item.fixedBuild && (
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                <strong style={{ color: '#34d399' }}>F:</strong> {item.fixedBuild}
+                              </span>
+                            )}
+                            {!item.raisedBuild && !item.fixedBuild && <span>—</span>}
+                          </div>
+                        </td>
                         <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                         <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                         <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
@@ -866,6 +979,55 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
+
+      {/* Fixed Build Modal */}
+      {showFixedBuildModal && createPortal(
+        <div className="modal-overlay" onClick={handleCancelFixedBuild}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Select Fixed Build</h3>
+              <button className="modal-close" onClick={handleCancelFixedBuild}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label>Fixed Build Number</label>
+                <select
+                  className="form-select"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                >
+                  <option value="">-- Select Build Number --</option>
+                  {modalBuildOptions.map(b => (
+                    <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label>Or enter custom Build Number</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Build 1.0.1"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmFixedBuild}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
@@ -908,7 +1070,7 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* Work Type & Status Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Work Type */}
                 <div className="form-group">
                   <label htmlFor="funcWorkType">Work type <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -1046,7 +1208,7 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* Priority & Parent Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Priority */}
                 <div className="form-group">
                   <label htmlFor="funcPriority">Priority</label>
@@ -1142,7 +1304,7 @@ export default function EmployeeDashboard() {
 
               {/* Due Date & Start Date Row */}
               {functionalWorkType !== 'Bug' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   {/* Due Date */}
                   <div className="form-group">
                     <label htmlFor="funcDueDate">Due date</label>
@@ -1170,7 +1332,7 @@ export default function EmployeeDashboard() {
               )}
 
               {/* Labels & Team Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Labels */}
                 {functionalWorkType !== 'Bug' ? (
                   <div className="form-group">

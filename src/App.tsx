@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -17,16 +17,17 @@ import {
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
 import { UserSession, API_BASE_URL, api } from './services/api';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import EmployeeDashboard from './pages/EmployeeDashboard';
-import WorkItemDetails from './pages/WorkItemDetails';
-import EmployeeManagement from './pages/EmployeeManagement';
-import BugDetails from './pages/BugDetails';
-import MyNotes from './pages/MyNotes';
-import ResetPassword from './pages/ResetPassword';
+
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Projects = lazy(() => import('./pages/Projects'));
+const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
+const WorkItemDetails = lazy(() => import('./pages/WorkItemDetails'));
+const EmployeeManagement = lazy(() => import('./pages/EmployeeManagement'));
+const BugDetails = lazy(() => import('./pages/BugDetails'));
+const MyNotes = lazy(() => import('./pages/MyNotes'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 // Auth Context
 interface AuthContextType {
@@ -92,14 +93,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         top: 0, left: 0, right: 0
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <span style={{ fontWeight: 800, fontSize: '1.4rem', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center' }}>
-            <span style={{ color: '#FBBF24' }}>e</span><span style={{ color: '#fff' }}>Med Ticketing System</span>
+            <span style={{ color: '#FBBF24' }}>e</span>
+            <span className="navbar-brand-full" style={{ color: '#fff' }}>Med Ticketing System</span>
+            <span className="navbar-brand-short" style={{ color: '#fff' }}>Med</span>
           </span>
         </div>
-        
+
         {/* Right side items */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -116,11 +119,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 800,
-              fontSize: '0.85rem'
+              fontSize: '0.85rem',
+              flexShrink: 0
             }}>
               {initials[0]}
             </div>
-            <span>{user.name}</span>
+            <span className="navbar-user-name">{user.name}</span>
             {user.roles && user.roles.length > 1 ? (
               <select
                 value={user.userType}
@@ -202,7 +206,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             }}
           >
             <LogOut size={14} />
-            <span>Logout</span>
+            <span className="navbar-logout-label">Logout</span>
           </button>
         </div>
       </header>
@@ -337,27 +341,36 @@ const ToastContainer: React.FC = () => {
   );
 };
 
+const RouteLoadingFallback: React.FC = () => (
+  <div className="loading-center">
+    <Layers size={22} color="var(--primary)" />
+    <span>Loading...</span>
+  </div>
+);
+
 export const AppContent: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <>
-      <Routes>
-        <Route path="/login"    element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/login"    element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route path="/" element={
-          <ProtectedRoute>
-            {user?.userType === 'ProductManager' ? <Dashboard /> : <EmployeeDashboard />}
-          </ProtectedRoute>
-        } />
-        <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-        <Route path="/workitems/:id" element={<ProtectedRoute><WorkItemDetails /></ProtectedRoute>} />
-        <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
-        <Route path="/bugs/:bugId" element={<ProtectedRoute><BugDetails /></ProtectedRoute>} />
-        <Route path="/notes" element={<ProtectedRoute><MyNotes /></ProtectedRoute>} />
-        <Route path="/reset-password" element={<ProtectedRoute><ResetPassword /></ProtectedRoute>} />
-      </Routes>
+          <Route path="/" element={
+            <ProtectedRoute>
+              {user?.userType === 'ProductManager' ? <Dashboard /> : <EmployeeDashboard />}
+            </ProtectedRoute>
+          } />
+          <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+          <Route path="/workitems/:id" element={<ProtectedRoute><WorkItemDetails /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
+          <Route path="/bugs/:bugId" element={<ProtectedRoute><BugDetails /></ProtectedRoute>} />
+          <Route path="/notes" element={<ProtectedRoute><MyNotes /></ProtectedRoute>} />
+          <Route path="/reset-password" element={<ProtectedRoute><ResetPassword /></ProtectedRoute>} />
+        </Routes>
+      </Suspense>
       <ToastContainer />
     </>
   );

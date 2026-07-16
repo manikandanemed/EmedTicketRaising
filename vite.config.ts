@@ -16,6 +16,11 @@ export default defineConfig(({ command }) => ({
         target: 'http://localhost:5298',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ticket-system/, ''),
+      },
+      '/ticket-system/uploads': {
+        target: 'http://localhost:5298',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ticket-system/, ''),
       }
     }
   }

@@ -171,7 +171,7 @@ export default function EmployeeManagement() {
       </div>
 
       {/* KPI Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
         {[
           { label: 'Total Employees', value: employees.length, color: 'var(--primary)', bg: 'rgba(14,165,233,0.12)', glow: 'var(--primary-glow)' },
           { label: 'Active',          value: active.length,    color: 'var(--success)',  bg: 'rgba(52,211,153,0.12)',  glow: 'var(--success-glow)' },

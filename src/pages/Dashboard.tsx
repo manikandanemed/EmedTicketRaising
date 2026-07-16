@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, DashboardResponseDto, BugDto } from '../services/api';
 import { toast } from '../services/toast';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Briefcase, CheckSquare, Bug, Users, Loader2,
   AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
@@ -96,15 +97,18 @@ export default function Dashboard() {
     }
   };
 
+  // Debounce search text so we don't fire an API call on every keystroke
+  const debouncedPmBugSearch = useDebounce(pmBugSearch, 400);
+
   // Reset page when PM bug filters change
-  useEffect(() => { setPmBugPage(1); }, [pmBugStatus, pmBugDate, pmBugSearch]);
+  useEffect(() => { setPmBugPage(1); }, [pmBugStatus, pmBugDate, debouncedPmBugSearch]);
 
   // Re-fetch PM bugs when page/filters change
   const pmBugsFirstRender = React.useRef(true);
   useEffect(() => {
     if (pmBugsFirstRender.current) { pmBugsFirstRender.current = false; fetchPmBugs(); return; }
     fetchPmBugs();
-  }, [pmBugPage, pmBugStatus, pmBugDate, pmBugSearch]);
+  }, [pmBugPage, pmBugStatus, pmBugDate, debouncedPmBugSearch]);
 
   if (loading) {
     return (
@@ -233,7 +237,7 @@ export default function Dashboard() {
       </div>
 
       {/* Status Breakdowns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+      <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
         {/* Work Items */}
         <div className="glass-panel" style={{ padding: '28px' }}>
           <div className="section-header" style={{ marginBottom: '22px' }}>

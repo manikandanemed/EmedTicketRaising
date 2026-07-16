@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   api, BugDto, WorkItemDto, CommentDto, SoftwareBuildDto, API_BASE_URL
@@ -8,7 +9,7 @@ import { toast } from '../services/toast';
 import {
   Bug, ArrowLeft, CheckCircle2, Clock, AlertCircle,
   FileImage, MessageSquare, Send, Calendar, User,
-  ExternalLink, Eye, Loader2
+  ExternalLink, Eye, Loader2, X
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,8 +36,43 @@ export default function BugDetails() {
 
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Fixed Build Modal states
+  const [showFixedBuildModal, setShowFixedBuildModal] = useState(false);
+  const [pendingStatusValue, setPendingStatusValue] = useState('');
+  const [selectedFixedBuild, setSelectedFixedBuild] = useState('');
+  const [modalBuildOptions, setModalBuildOptions] = useState<SoftwareBuildDto[]>([]);
+
+  const handleConfirmFixedBuild = async () => {
+    if (!bug) return;
+    if (!selectedFixedBuild.trim()) {
+      toast.error('Please select or enter a build number');
+      return;
+    }
+    setShowFixedBuildModal(false);
+    setUpdatingStatus(true);
+    try {
+      const res = await api.updateBugStatus(bug.id, pendingStatusValue, selectedFixedBuild.trim());
+      if (res.success) {
+        setBug(prev => prev ? { ...prev, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : prev);
+        toast.success('Bug status updated!');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update status');
+    } finally {
+      setUpdatingStatus(false);
+      setPendingStatusValue('');
+      setSelectedFixedBuild('');
+    }
+  };
+
+  const handleCancelFixedBuild = () => {
+    setShowFixedBuildModal(false);
+    setPendingStatusValue('');
+    setSelectedFixedBuild('');
+  };
 
   const numBugId = Number(bugId);
 
@@ -74,15 +110,19 @@ export default function BugDetails() {
 
   const handleStatusChange = async (status: string) => {
     if (!bug) return;
-    let fixedBuild: string | null = null;
     if (status === 'fixed') {
-      const buildOptions = projectBuilds.map(b => b.buildNumber).join(', ');
-      fixedBuild = window.prompt(`Please enter the Fixed Build Number (${buildOptions || 'no builds registered'}):`);
-      if (fixedBuild === null) return; // cancel
+      setPendingStatusValue(status);
+      setSelectedFixedBuild('');
+      setModalBuildOptions(projectBuilds);
+      if (projectBuilds.length > 0) {
+        setSelectedFixedBuild(projectBuilds[0].buildNumber);
+      }
+      setShowFixedBuildModal(true);
+      return;
     }
     setUpdatingStatus(true);
     try {
-      const res = await api.updateBugStatus(bug.id, status, fixedBuild);
+      const res = await api.updateBugStatus(bug.id, status, null);
       if (res.success) {
         setBug(prev => prev ? { ...prev, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : prev);
         toast.success('Bug status updated!');
@@ -193,7 +233,7 @@ export default function BugDetails() {
                 <CheckCircle2 size={18} color="var(--primary)" />
                 <span style={{ fontWeight: 700, fontSize: '1rem' }}>Parent Task — Understand What To Fix</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task</div>
                   <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{workItem.workNumber}</div>
@@ -417,6 +457,55 @@ export default function BugDetails() {
         >
           <img src={lightboxUrl} alt="Screenshot" style={{ maxWidth: '92vw', maxHeight: '92vh', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
         </div>
+      )}
+
+      {/* Fixed Build Modal */}
+      {showFixedBuildModal && createPortal(
+        <div className="modal-overlay" onClick={handleCancelFixedBuild}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Select Fixed Build</h3>
+              <button className="modal-close" onClick={handleCancelFixedBuild}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label>Fixed Build Number</label>
+                <select
+                  className="form-select"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                >
+                  <option value="">-- Select Build Number --</option>
+                  {modalBuildOptions.map(b => (
+                    <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label>Or enter custom Build Number</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Build 1.0.1"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmFixedBuild}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

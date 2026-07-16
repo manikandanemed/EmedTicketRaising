@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { api, API_BASE_URL } from '../services/api';
 import { useAuth } from '../App';
-import { KeyRound, Lock, CheckCircle, AlertCircle, Camera, Trash2, Mail, Pencil } from 'lucide-react';
+import { KeyRound, Lock, CheckCircle, AlertCircle, Camera, Trash2 } from 'lucide-react';
 
 export default function ResetPassword() {
   const { user, logout, updateUser } = useAuth();
@@ -18,15 +18,18 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
 
-  // Email Update State
-  const [newEmail, setNewEmail] = useState('');
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [emailSuccess, setEmailSuccess] = useState('');
-
   // Photo Upload State
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+
+  // Custom Confirm Modal
+  const [customConfirm, setCustomConfirm] = useState<{
+    title: string; message: string; onConfirm: () => void;
+    isDanger?: boolean; confirmLabel?: string;
+  } | null>(null);
+  const showConfirm = (title: string, message: string, onConfirm: () => void, isDanger = false, confirmLabel = 'Confirm') => {
+    setCustomConfirm({ title, message, onConfirm, isDanger, confirmLabel });
+  };
 
   // Cropper State
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -185,31 +188,6 @@ export default function ResetPassword() {
     }
   };
 
-  const handleEmailUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEmailError('');
-    setEmailSuccess('');
-    if (!newEmail.includes('@')) {
-      setEmailError('Please enter a valid email address.');
-      return;
-    }
-    setEmailLoading(true);
-    try {
-      const res = await api.updateEmail(newEmail);
-      if (res.success) {
-        setEmailSuccess('Email updated successfully! Please log in again with your new email.');
-        if (user) updateUser({ ...user, email: newEmail.trim().toLowerCase() });
-        setNewEmail('');
-      } else {
-        setEmailError(res.message || 'Failed to update email.');
-      }
-    } catch (err: any) {
-      setEmailError(err.message || 'Error updating email.');
-    } finally {
-      setEmailLoading(false);
-    }
-  };
-
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -222,27 +200,33 @@ export default function ResetPassword() {
   };
 
   const handlePhotoRemove = async () => {
-    if (!window.confirm('Are you sure you want to remove your profile photo?')) return;
-
-    setUploading(true);
-    setPhotoError('');
-    try {
-      const res = await api.removeProfilePicture();
-      if (res.success) {
-        if (user) {
-          updateUser({
-            ...user,
-            profilePicture: undefined
-          });
+    showConfirm(
+      'Remove Profile Photo?',
+      'Are you sure you want to remove your profile photo?',
+      async () => {
+        setUploading(true);
+        setPhotoError('');
+        try {
+          const res = await api.removeProfilePicture();
+          if (res.success) {
+            if (user) {
+              updateUser({
+                ...user,
+                profilePicture: undefined
+              });
+            }
+          } else {
+            setPhotoError(res.message || 'Failed to remove photo');
+          }
+        } catch (err: any) {
+          setPhotoError(err.message || 'Error removing photo');
+        } finally {
+          setUploading(false);
         }
-      } else {
-        setPhotoError(res.message || 'Failed to remove photo');
-      }
-    } catch (err: any) {
-      setPhotoError(err.message || 'Error removing photo');
-    } finally {
-      setUploading(false);
-    }
+      },
+      true,
+      'Yes, Remove'
+    );
   };
 
   if (!user) return null;
@@ -357,63 +341,6 @@ export default function ResetPassword() {
 
         {/* Right Column: Email + Password */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {/* Update Email Panel */}
-          <div className="glass-panel" style={{ padding: '32px' }}>
-            <h3 style={{ margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Mail size={20} className="gradient-text" />
-              <span>Update Email</span>
-            </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '16px', marginTop: '-8px' }}>
-              Current: <strong style={{ color: 'var(--text-primary)' }}>{user.email || user.name}</strong>
-            </p>
-            <form onSubmit={handleEmailUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {emailError && (
-                <div style={{
-                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-                  borderRadius: '6px', padding: '10px 14px', color: 'var(--danger)',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem'
-                }}>
-                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                  <span>{emailError}</span>
-                </div>
-              )}
-              {emailSuccess && (
-                <div style={{
-                  background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)',
-                  borderRadius: '6px', padding: '10px 14px', color: 'var(--success)',
-                  display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem'
-                }}>
-                  <CheckCircle size={15} style={{ flexShrink: 0 }} />
-                  <span>{emailSuccess}</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-                  <input
-                    id="newEmail"
-                    type="email"
-                    className="form-input"
-                    placeholder="Enter new email address"
-                    value={newEmail}
-                    onChange={e => setNewEmail(e.target.value)}
-                    required
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={emailLoading || !newEmail.includes('@')}
-                  style={{ padding: '10px 18px', gap: '6px', whiteSpace: 'nowrap' }}
-                >
-                  <Pencil size={14} />
-                  {emailLoading ? 'Saving...' : 'Update'}
-                </button>
-              </div>
-            </form>
-          </div>
 
           {/* Change Password Panel */}
           <div className="glass-panel" style={{ padding: '32px' }}>
@@ -605,6 +532,65 @@ export default function ResetPassword() {
                 style={{ padding: '8px 20px', minWidth: '100px' }}
               >
                 {uploading ? 'Uploading...' : 'Save & Set'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Confirm Modal */}
+      {customConfirm && createPortal(
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div 
+            className="modal-content glass-panel" 
+            style={{ 
+              maxWidth: '450px', 
+              padding: '24px', 
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(20, 20, 25, 0.92)'
+            }}
+          >
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: customConfirm.isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertCircle size={22} style={{ color: customConfirm.isDanger ? '#ef4444' : '#8b5cf6' }} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                  {customConfirm.title}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  {customConfirm.message}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setCustomConfirm(null)}
+                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`btn ${customConfirm.isDanger ? 'btn-danger' : 'btn-primary'}`}
+                onClick={() => {
+                  setCustomConfirm(null);
+                  customConfirm.onConfirm();
+                }}
+                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+              >
+                {customConfirm.confirmLabel || 'Confirm'}
               </button>
             </div>
           </div>

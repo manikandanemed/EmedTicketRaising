@@ -108,10 +108,14 @@ export interface WorkItemDto {
   epicName?: string | null;
   epicColor?: string | null;
   severity?: string | null;
+  issueType?: string | null;
   assignedToUserId?: number | null;
   fixedBillNumber?: string | null;
   raisedBillNumber?: string | null;
   developerBillLock?: boolean;
+  createdByUserId: number;
+  raisedBuild?: string | null;
+  fixedBuild?: string | null;
 }
 
 export interface EmployeeDropdownDto {
@@ -388,6 +392,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  updateWorkItem: (workItemId: number, body: any) =>
+    request<WorkItemDto>(`/api/project/workitems/${workItemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteWorkItem: (workItemId: number) =>
+    request<string>(`/api/project/workitems/${workItemId}`, {
+      method: 'DELETE',
+    }),
+
   getWorkItemsByProject: (projectId: number) =>
     request<WorkItemDto[]>(`/api/project/${projectId}/workitems`),
 
@@ -403,7 +418,7 @@ export const api = {
 
 
   // Paginated + filtered employee work items
-  getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string; workType?: string } = {}) => {
+  getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string; workType?: string; priority?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.page)     q.set('page',     String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
@@ -411,6 +426,7 @@ export const api = {
     if (params.dueDate)  q.set('dueDate',  params.dueDate);
     if (params.search)   q.set('search',   params.search);
     if (params.workType) q.set('workType', params.workType);
+    if (params.priority) q.set('priority', params.priority);
     return request<PagedResult<WorkItemDto>>(`/api/project/workitems/myworks/paged?${q}`);
   },
 
@@ -419,7 +435,7 @@ export const api = {
 
   getEmployeesDropdown: () => request<EmployeeDropdownDto[]>('/api/project/employees/dropdown'),
 
-  updateWorkItemStatus: (workItemId: number, payload: string | { status: string; fixedBillNumber?: string; raisedBillNumber?: string; developerBillLock?: boolean }) => {
+  updateWorkItemStatus: (workItemId: number, payload: string | { status: string; fixedBillNumber?: string; raisedBillNumber?: string; developerBillLock?: boolean; fixedBuild?: string }) => {
     const bodyObj = typeof payload === 'string' ? { status: payload } : payload;
     return request<WorkItemDto>(`/api/project/workitems/${workItemId}/status`, {
       method: 'PUT',

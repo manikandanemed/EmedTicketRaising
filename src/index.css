@@ -526,6 +526,36 @@ body {
   }
 }
 
+/* =============================================
+   RESPONSIVE — TOP NAVBAR
+   ============================================= */
+.navbar-brand-short { display: none; }
+
+@media (max-width: 480px) {
+  .top-navbar { padding: 0 12px !important; }
+  .navbar-right { gap: 10px !important; }
+  .navbar-brand-full { display: none; }
+  .navbar-brand-short { display: inline; }
+  .navbar-user-name { display: none; }
+  .navbar-logout-label { display: none; }
+}
+
+/* =============================================
+   RESPONSIVE — PHONE BREAKPOINT (~480px)
+   ============================================= */
+@media (max-width: 480px) {
+  .main-content { padding: 14px !important; }
+  .page-header { flex-direction: column; gap: 14px; }
+  .page-header-actions { width: 100%; }
+  .stat-info p { font-size: 1.8rem !important; }
+  .modal-content { padding: 20px !important; }
+  .search-filter-bar { flex-direction: column; align-items: stretch; }
+  .search-input-wrapper { min-width: 0; }
+
+  /* Two/three-column form and KPI grids collapse to a single column on phones */
+  .form-grid-2 { grid-template-columns: 1fr !important; }
+}
+
 /* LOGO */
 .logo {
   display: flex;

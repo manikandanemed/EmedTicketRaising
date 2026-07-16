@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   api, 
@@ -90,6 +91,22 @@ export default function WorkItemDetails() {
   const [fixedBill, setFixedBill] = useState('');
   const [raisedBill, setRaisedBill] = useState('');
 
+  // Fixed Build Modal (for task/bug status changes)
+  const [showFixedBuildModal, setShowFixedBuildModal] = useState(false);
+  const [pendingStatusForBuild, setPendingStatusForBuild] = useState('');
+  const [pendingBugIdForBuild, setPendingBugIdForBuild] = useState<number | null>(null);
+  const [selectedFixedBuild, setSelectedFixedBuild] = useState('');
+  const [modalBuildOptions, setModalBuildOptions] = useState<SoftwareBuildDto[]>([]);
+
+  // Custom confirm modal
+  const [customConfirm, setCustomConfirm] = useState<{
+    title: string; message: string; onConfirm: () => void;
+    isDanger?: boolean; confirmLabel?: string;
+  } | null>(null);
+  const showConfirm = (title: string, message: string, onConfirm: () => void, isDanger = false, confirmLabel = 'Confirm') => {
+    setCustomConfirm({ title, message, onConfirm, isDanger, confirmLabel });
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = async () => {
@@ -153,24 +170,29 @@ export default function WorkItemDetails() {
   }, [workItem]);
 
   const handleDeveloperBillLock = async () => {
-    if (!window.confirm("Once locked, this work item will be resolved/completed and cannot be edited. Are you sure you want to lock it?")) {
-      return;
-    }
-    setUpdatingStatus(true);
-    try {
-      const res = await api.updateWorkItemStatus(workItemId, {
-        status: 'completed',
-        developerBillLock: true
-      });
-      if (res.success) {
-        setWorkItem(res.data);
-        toast.success('Task locked for billing and completed!');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to lock billing');
-    } finally {
-      setUpdatingStatus(false);
-    }
+    showConfirm(
+      'Lock & Complete Task?',
+      'Once locked, this work item will be resolved/completed and cannot be edited. Are you sure you want to lock it?',
+      async () => {
+        setUpdatingStatus(true);
+        try {
+          const res = await api.updateWorkItemStatus(workItemId, {
+            status: 'completed',
+            developerBillLock: true
+          });
+          if (res.success) {
+            setWorkItem(res.data);
+            toast.success('Task locked for billing and completed!');
+          }
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to lock billing');
+        } finally {
+          setUpdatingStatus(false);
+        }
+      },
+      false,
+      'Yes, Lock It'
+    );
   };
 
   const handleSaveBilling = async () => {
@@ -220,9 +242,26 @@ export default function WorkItemDetails() {
     const status = e.target.value;
     if (!workItem) return;
 
+    if (status === 'fixed' || status === 'completed') {
+      setPendingStatusForBuild(status);
+      setPendingBugIdForBuild(null);
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+      // Load builds for the project
+      try {
+        const buildsRes = await api.getBuildsByProject(workItem.projectId);
+        if (buildsRes.success) {
+          setModalBuildOptions(buildsRes.data);
+          if (buildsRes.data.length > 0) setSelectedFixedBuild(buildsRes.data[0].buildNumber);
+        }
+      } catch (_) {}
+      setShowFixedBuildModal(true);
+      return;
+    }
+
     setUpdatingStatus(true);
     try {
-      const res = await api.updateWorkItemStatus(workItem.id, status);
+      const res = await api.updateWorkItemStatus(workItem.id, { status });
       if (res.success) {
         setWorkItem(res.data);
         toast.success('Status updated successfully!');
@@ -232,6 +271,52 @@ export default function WorkItemDetails() {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  const handleConfirmFixedBuild = async () => {
+    if (!selectedFixedBuild.trim()) {
+      toast.error('Please select or enter a build number');
+      return;
+    }
+    setShowFixedBuildModal(false);
+    if (pendingBugIdForBuild !== null) {
+      // Bug status change
+      try {
+        const res = await api.updateBugStatus(pendingBugIdForBuild, pendingStatusForBuild, selectedFixedBuild.trim());
+        if (res.success) {
+          setBugs(prev => prev.map(b => b.id === pendingBugIdForBuild ? { ...b, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : b));
+          toast.success('Bug status updated!');
+        }
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to update bug status');
+      }
+    } else if (workItem) {
+      // Task status change
+      setUpdatingStatus(true);
+      try {
+        const res = await api.updateWorkItemStatus(workItem.id, { status: pendingStatusForBuild, fixedBuild: selectedFixedBuild.trim() });
+        if (res.success) {
+          setWorkItem(res.data);
+          toast.success('Status updated successfully!');
+        }
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to update status');
+      } finally {
+        setUpdatingStatus(false);
+      }
+    }
+    setPendingStatusForBuild('');
+    setPendingBugIdForBuild(null);
+    setSelectedFixedBuild('');
+    setModalBuildOptions([]);
+  };
+
+  const handleCancelFixedBuild = () => {
+    setShowFixedBuildModal(false);
+    setPendingStatusForBuild('');
+    setPendingBugIdForBuild(null);
+    setSelectedFixedBuild('');
+    setModalBuildOptions([]);
   };
 
   const handleAssigneeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -367,16 +452,27 @@ export default function WorkItemDetails() {
 
   // Update Bug Status
   const handleBugStatusChange = async (bugId: number, status: string) => {
-    let fixedBuild: string | null = null;
     if (status === 'fixed') {
-      const buildOptions = projectBuilds.map(b => b.buildNumber).join(', ');
-      fixedBuild = window.prompt(`Please enter the Fixed Build Number (${buildOptions || 'no builds registered'}):`);
-      if (fixedBuild === null) return; // cancel
+      setPendingBugIdForBuild(bugId);
+      setPendingStatusForBuild(status);
+      setSelectedFixedBuild('');
+      setModalBuildOptions([]);
+      if (workItem) {
+        try {
+          const buildsRes = await api.getBuildsByProject(workItem.projectId);
+          if (buildsRes.success) {
+            setModalBuildOptions(buildsRes.data);
+            if (buildsRes.data.length > 0) setSelectedFixedBuild(buildsRes.data[0].buildNumber);
+          }
+        } catch (_) {}
+      }
+      setShowFixedBuildModal(true);
+      return;
     }
     try {
-      const res = await api.updateBugStatus(bugId, status, fixedBuild);
+      const res = await api.updateBugStatus(bugId, status, null);
       if (res.success) {
-        setBugs(bugs.map(b => b.id === bugId ? { ...b, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : b));
+        setBugs(prev => prev.map(b => b.id === bugId ? { ...b, status: res.data.status, fixedAt: res.data.fixedAt, closedAt: res.data.closedAt, fixedBuild: res.data.fixedBuild } : b));
         toast.success('Bug status updated!');
       }
     } catch (err: any) {
@@ -649,86 +745,26 @@ export default function WorkItemDetails() {
                 </div>
               </div>
             )}
-            {/* Billing System (Requirement 22-27) */}
-            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '16px', marginTop: '8px' }}>
-              <h4 style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', color: 'var(--primary)' }}>
-                💳 Billing & Reference
-              </h4>
-              
-              {isPM ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Fixed Bill Number</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="e.g. FXD-10293" 
-                      value={fixedBill} 
-                      onChange={(e) => setFixedBill(e.target.value)}
+            {/* Lock & Complete (employee only, when not already locked) */}
+            {!isPM && (
+              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '16px', marginTop: '8px' }}>
+                {workItem.developerBillLock ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <span>🔒 Locked for Billing</span>
+                  </div>
+                ) : (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px', background: 'rgba(139, 122, 208, 0.05)', border: '1px solid var(--border-soft)', borderRadius: '6px', transition: 'var(--transition)' }}>
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={handleDeveloperBillLock}
+                      style={{ accentColor: 'var(--primary)', width: '16px', height: '16px', cursor: 'pointer' }}
                     />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Raised Bill Number</label>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input 
-                        type="text" 
-                        className="form-input" 
-                        placeholder="e.g. BILL-98273" 
-                        value={raisedBill} 
-                        onChange={(e) => setRaisedBill(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary" 
-                        onClick={handleGenerateBillNumber}
-                        title="Generate raised bill number automatically"
-                        style={{ padding: '0 10px', height: '42px' }}
-                      >
-                        ⚡
-                      </button>
-                    </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    className="btn btn-primary" 
-                    onClick={handleSaveBilling}
-                    style={{ width: '100%', padding: '8px', fontSize: '0.85rem', marginTop: '4px' }}
-                  >
-                    Save Billing Info
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {workItem.developerBillLock ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>
-                      <span>🔒 Locked for Billing</span>
-                    </div>
-                  ) : (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '10px', background: 'rgba(139, 122, 208, 0.05)', border: '1px solid var(--border-soft)', borderRadius: '6px', transition: 'var(--transition)' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={false} 
-                        onChange={handleDeveloperBillLock} 
-                        style={{ accentColor: 'var(--primary)', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Lock & Complete Task</span>
-                    </label>
-                  )}
-
-                  {workItem.fixedBillNumber && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      Fixed Bill: <strong style={{ color: 'var(--text-primary)' }}>{workItem.fixedBillNumber}</strong>
-                    </div>
-                  )}
-                  {workItem.raisedBillNumber && (
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      Raised Bill: <strong style={{ color: 'var(--text-primary)' }}>{workItem.raisedBillNumber}</strong>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Lock & Complete Task</span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
@@ -1276,6 +1312,114 @@ export default function WorkItemDetails() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Fixed Build Modal */}
+      {showFixedBuildModal && createPortal(
+        <div className="modal-overlay" onClick={handleCancelFixedBuild}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Select Fixed Build</h3>
+              <button className="modal-close" onClick={handleCancelFixedBuild}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label>Fixed Build Number</label>
+                <select
+                  className="form-select"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                >
+                  <option value="">-- Select Build Number --</option>
+                  {modalBuildOptions.map(b => (
+                    <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label>Or enter custom Build Number</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Build 1.0.1"
+                  value={selectedFixedBuild}
+                  onChange={e => setSelectedFixedBuild(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConfirmFixedBuild}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Confirm Modal */}
+      {customConfirm && createPortal(
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div 
+            className="modal-content glass-panel" 
+            style={{ 
+              maxWidth: '450px', 
+              padding: '24px', 
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(20, 20, 25, 0.92)'
+            }}
+          >
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: customConfirm.isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertCircle size={22} style={{ color: customConfirm.isDanger ? '#ef4444' : '#8b5cf6' }} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                  {customConfirm.title}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  {customConfirm.message}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setCustomConfirm(null)}
+                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`btn ${customConfirm.isDanger ? 'btn-danger' : 'btn-primary'}`}
+                onClick={() => {
+                  setCustomConfirm(null);
+                  customConfirm.onConfirm();
+                }}
+                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+              >
+                {customConfirm.confirmLabel || 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
