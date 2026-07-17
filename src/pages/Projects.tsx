@@ -496,25 +496,28 @@ export default function Projects() {
               }
             } catch (_) {}
 
-            // Task row
-            allRows.push({
-              issueType: 'Task',
-              projectCode: p.projectNumber,
-              projectName: p.name,
-              issueNumber: w.workNumber,
-              title: w.title,
-              description: w.description || '',
-              status: w.status,
-              priority: w.priority,
-              assignedTo: w.assignedTo || 'Unassigned',
-              raisedBy: w.createdBy,
-              createdAt: new Date(w.createdAt).toLocaleDateString(),
-              dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
-              fixedAt: '',
-              closedAt: '',
-              parentIssue: '',
-              comments: commentsText
-            });
+            // Task row (skip if this work item is itself a Bug — it's exported once
+            // below as a Bug row instead, to avoid duplicate Task+Bug rows)
+            if (w.workType !== 'Bug') {
+              allRows.push({
+                issueType: 'Task',
+                projectCode: p.projectNumber,
+                projectName: p.name,
+                issueNumber: w.workNumber,
+                title: w.title,
+                description: w.description || '',
+                status: w.status,
+                priority: w.priority,
+                assignedTo: w.assignedTo || 'Unassigned',
+                raisedBy: w.createdBy,
+                createdAt: new Date(w.createdAt).toLocaleDateString(),
+                dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
+                fixedAt: '',
+                closedAt: '',
+                parentIssue: '',
+                comments: commentsText
+              });
+            }
 
             // Fetch bugs for this work item
             try {
@@ -639,25 +642,28 @@ export default function Projects() {
           }
         } catch (_) {}
 
-        // Task row
-        allRows.push({
-          issueType: 'Task',
-          projectCode: selectedProject.projectNumber,
-          projectName: selectedProject.name,
-          issueNumber: w.workNumber,
-          title: w.title,
-          description: w.description || '',
-          status: w.status,
-          priority: w.priority,
-          assignedTo: w.assignedTo || 'Unassigned',
-          raisedBy: w.createdBy,
-          createdAt: new Date(w.createdAt).toLocaleDateString(),
-          dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
-          fixedAt: '',
-          closedAt: '',
-          parentIssue: '',
-          comments: commentsText
-        });
+        // Task row (skip if this work item is itself a Bug — it's exported once
+        // below as a Bug row instead, to avoid duplicate Task+Bug rows)
+        if (w.workType !== 'Bug') {
+          allRows.push({
+            issueType: 'Task',
+            projectCode: selectedProject.projectNumber,
+            projectName: selectedProject.name,
+            issueNumber: w.workNumber,
+            title: w.title,
+            description: w.description || '',
+            status: w.status,
+            priority: w.priority,
+            assignedTo: w.assignedTo || 'Unassigned',
+            raisedBy: w.createdBy,
+            createdAt: new Date(w.createdAt).toLocaleDateString(),
+            dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
+            fixedAt: '',
+            closedAt: '',
+            parentIssue: '',
+            comments: commentsText
+          });
+        }
 
         // Fetch bugs for this work item
         try {
