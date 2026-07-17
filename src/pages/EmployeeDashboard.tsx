@@ -18,7 +18,7 @@ import {
   PlusCircle,
   X
 } from 'lucide-react';
-import { api, WorkItemDto, BugDto, API_BASE_URL } from '../services/api';
+import { api, WorkItemDto, BugDto, API_BASE_URL, ClientDto, ProductDto, ModuleDto, SoftwareBuildDto } from '../services/api';
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
@@ -64,6 +64,17 @@ export default function EmployeeDashboard() {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [creatingWorkItem, setCreatingWorkItem] = useState(false);
 
+  // Client, Product, Module, Build states (for Create Work Item modal — mirrors PM's Projects.tsx)
+  const [clients, setClients] = useState<ClientDto[]>([]);
+  const [selectedClientIdForCreation, setSelectedClientIdForCreation] = useState<number | ''>('');
+  const [productsForCreation, setProductsForCreation] = useState<ProductDto[]>([]);
+  const [selectedProductIdForCreation, setSelectedProductIdForCreation] = useState<number | ''>('');
+  const [modulesForCreation, setModulesForCreation] = useState<ModuleDto[]>([]);
+  const [selectedModuleIdForCreation, setSelectedModuleIdForCreation] = useState<number | ''>('');
+  const [buildsForCreation, setBuildsForCreation] = useState<SoftwareBuildDto[]>([]);
+  const [raisedBuildForCreation, setRaisedBuildForCreation] = useState('');
+  const [fixedBuildForCreation, setFixedBuildForCreation] = useState('');
+
   const [newWorkTitle, setNewWorkTitle] = useState('');
   const [newWorkDesc, setNewWorkDesc] = useState('');
   const [newWorkAssignedId, setNewWorkAssignedId] = useState<number | ''>('');
@@ -89,10 +100,11 @@ export default function EmployeeDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tasksRes, projectsRes, employeesRes] = await Promise.all([
+      const [tasksRes, projectsRes, employeesRes, clientsRes] = await Promise.all([
         api.getMyWorkItemsPaged({ page: 1, pageSize: ITEMS_PER_PAGE }),
         api.getAllProjects(),
-        api.getEmployeesDropdown()
+        api.getEmployeesDropdown(),
+        api.getClients()
       ]);
 
       if (tasksRes.success) {
@@ -102,6 +114,7 @@ export default function EmployeeDashboard() {
       }
       if (projectsRes.success) setProjects(projectsRes.data);
       if (employeesRes.success) setEmployees(employeesRes.data);
+      if (clientsRes.success) setClients(clientsRes.data);
 
       // Load previously involved tasks (reassigned away)
       try {
@@ -165,15 +178,18 @@ export default function EmployeeDashboard() {
         team: functionalTeam || null,
         attachmentUrls: uploadedAttachmentUrls.join(',') || null,
         assignedToUserId: newWorkAssignedId === '' ? null : Number(newWorkAssignedId),
+        moduleId: selectedModuleIdForCreation === '' ? null : Number(selectedModuleIdForCreation),
         epicName: functionalWorkType === 'Epic' ? newEpicName || newWorkTitle : null,
         epicColor: functionalWorkType === 'Epic' ? newEpicColor : null,
         severity: functionalWorkType === 'Bug' ? bugSeverity : null,
-        issueType: functionalWorkType === 'Bug' ? bugIssueType : null
+        issueType: functionalWorkType === 'Bug' ? bugIssueType : null,
+        raisedBuild: raisedBuildForCreation || null,
+        fixedBuild: fixedBuildForCreation || null
       });
 
       if (res.success) {
         toast.success('Work item created successfully!');
-        
+
         // Refresh data
         fetchData();
 
@@ -196,7 +212,14 @@ export default function EmployeeDashboard() {
           setFunctionalParentId('');
           setFunctionalLabel('');
           setFunctionalTeam('');
+          setRaisedBuildForCreation('');
+          setFixedBuildForCreation('');
+          setSelectedClientIdForCreation('');
           setUploadedAttachmentUrls([]);
+          setSelectedProductIdForCreation('');
+          setSelectedModuleIdForCreation('');
+          setProductsForCreation([]);
+          setModulesForCreation([]);
           setBugSeverity('3');
           setBugIssueType('New');
           setNewEpicName('');
@@ -1041,25 +1064,95 @@ export default function EmployeeDashboard() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Space (Project selection) */}
+              {/* Client Selection */}
               <div className="form-group">
-                <label htmlFor="funcSpace">Space <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <label htmlFor="funcClient">Client</label>
+                <select
+                  id="funcClient"
+                  className="form-select"
+                  value={selectedClientIdForCreation}
+                  onChange={(e) => {
+                    const clientVal = e.target.value === '' ? '' : Number(e.target.value);
+                    setSelectedClientIdForCreation(clientVal);
+                    // Reset project and modules if they don't match
+                    if (clientVal) {
+                      const selectedProj = projects.find((p: any) => p.id === selectedProjectIdForCreation);
+                      if (selectedProj && selectedProj.clientId !== clientVal) {
+                        setSelectedProjectIdForCreation('');
+                        setSelectedProductIdForCreation('');
+                        setSelectedModuleIdForCreation('');
+                        setProductsForCreation([]);
+                        setModulesForCreation([]);
+                        setBuildsForCreation([]);
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Select Client...</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Space / Project / Product selection */}
+              <div className="form-group">
+                <label htmlFor="funcSpace">Space/ Project/ Product <span style={{ color: 'var(--danger)' }}>*</span></label>
                 <select
                   id="funcSpace"
                   className="form-select"
                   value={selectedProjectIdForCreation}
-                  onChange={(e) => {
-                    setSelectedProjectIdForCreation(e.target.value === '' ? '' : Number(e.target.value));
-                    if (e.target.value) setProjectSelectError('');
+                  onChange={async (e) => {
+                    const projIdVal = e.target.value === '' ? '' : Number(e.target.value);
+                    setSelectedProjectIdForCreation(projIdVal);
+                    setSelectedProductIdForCreation('');
+                    setSelectedModuleIdForCreation('');
+                    setProductsForCreation([]);
+                    setModulesForCreation([]);
+                    setBuildsForCreation([]);
+
+                    if (projIdVal) {
+                      setProjectSelectError('');
+                      // Auto-select Client
+                      const proj = projects.find((p: any) => p.id === projIdVal);
+                      if (proj && proj.clientId) {
+                        setSelectedClientIdForCreation(proj.clientId);
+                      }
+
+                      try {
+                        // Fetch Project builds
+                        const buildsRes = await api.getBuildsByProject(projIdVal);
+                        if (buildsRes.success) {
+                          setBuildsForCreation(buildsRes.data);
+                        }
+
+                        // Fetch Project Products
+                        const prodRes = await api.getProducts(projIdVal);
+                        if (prodRes.success && prodRes.data.length > 0) {
+                          const firstProd = prodRes.data[0];
+                          setSelectedProductIdForCreation(firstProd.id);
+
+                          // Load modules for this first product directly
+                          const modRes = await api.getModules(firstProd.id);
+                          if (modRes.success) {
+                            setModulesForCreation(modRes.data);
+                          }
+                        }
+                      } catch (err) {}
+                    }
                   }}
                   style={projectSelectError ? { borderColor: 'var(--danger)', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.2)' } : {}}
                 >
-                  <option value="">Select Space/Project...</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.projectNumber})
-                    </option>
-                  ))}
+                  <option value="">Select Space/Project/Product...</option>
+                  {projects
+                    .filter((p: any) => !selectedClientIdForCreation || p.clientId === selectedClientIdForCreation)
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.projectNumber})
+                      </option>
+                    ))}
                 </select>
                 {projectSelectError && (
                   <div style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 500, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1067,6 +1160,27 @@ export default function EmployeeDashboard() {
                     <span>{projectSelectError}</span>
                   </div>
                 )}
+              </div>
+
+              {/* Module selection (Product selection is hidden) */}
+              <div className="form-group">
+                <label htmlFor="funcModule">Module</label>
+                <select
+                  id="funcModule"
+                  className="form-select"
+                  value={selectedModuleIdForCreation}
+                  disabled={!selectedProjectIdForCreation}
+                  onChange={(e) => {
+                    setSelectedModuleIdForCreation(e.target.value === '' ? '' : Number(e.target.value));
+                  }}
+                >
+                  <option value="">Select Module...</option>
+                  {modulesForCreation.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.moduleNumber})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Work Type & Status Row */}
@@ -1137,8 +1251,46 @@ export default function EmployeeDashboard() {
                   >
                     <option value="New">New</option>
                     <option value="Reopen">Reopen</option>
-                    <option value="Regression">Regression</option>
                   </select>
+                </div>
+              )}
+
+              {/* Build Numbers Row (visible if project selected) */}
+              {selectedProjectIdForCreation && (
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label htmlFor="funcRaisedBuild">Raised Build Number</label>
+                    <select
+                      id="funcRaisedBuild"
+                      className="form-select"
+                      value={raisedBuildForCreation}
+                      onChange={(e) => setRaisedBuildForCreation(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {buildsForCreation.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>
+                          {b.buildNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="funcFixedBuild">Fixed Build Number</label>
+                    <select
+                      id="funcFixedBuild"
+                      className="form-select"
+                      value={fixedBuildForCreation}
+                      onChange={(e) => setFixedBuildForCreation(e.target.value)}
+                    >
+                      <option value="">-- Select Build --</option>
+                      {buildsForCreation.map((b) => (
+                        <option key={b.id} value={b.buildNumber}>
+                          {b.buildNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -1198,7 +1350,7 @@ export default function EmployeeDashboard() {
                   value={newWorkAssignedId}
                   onChange={(e) => setNewWorkAssignedId(e.target.value === '' ? '' : Number(e.target.value))}
                 >
-                  <option value="">Automatic</option>
+                  <option value="">-- Unassigned --</option>
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.name} ({emp.email})
@@ -1207,7 +1359,7 @@ export default function EmployeeDashboard() {
                 </select>
               </div>
 
-              {/* Priority & Parent Row */}
+              {/* Priority + Conditional: Severity (Bug) | Epic Color (Epic) | Epic Link (Others) */}
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Priority */}
                 <div className="form-group">
@@ -1235,62 +1387,48 @@ export default function EmployeeDashboard() {
                       value={bugSeverity}
                       onChange={(e) => setBugSeverity(e.target.value)}
                     >
-                      <option value="1">1 (Lowest)</option>
+                      <option value="1">1 (Highest)</option>
                       <option value="2">2</option>
                       <option value="3">3</option>
                       <option value="4">4</option>
-                      <option value="5">5</option>
-                      <option value="6">6 (Highest)</option>
+                      <option value="5">5 (Lowest)</option>
                     </select>
                   </div>
                 )}
 
-                {/* Epic → Epic Name & Color */}
+                {/* Epic → Epic Color */}
                 {functionalWorkType === 'Epic' && (
-                  <>
-                    <div className="form-group">
-                      <label htmlFor="funcEpicName">Epic Name</label>
-                      <input
-                        id="funcEpicName"
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. User Authentication"
-                        value={newEpicName}
-                        onChange={(e) => setNewEpicName(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="funcEpicColor">Epic Color</label>
-                      <select
-                        id="funcEpicColor"
-                        className="form-select"
-                        value={newEpicColor}
-                        onChange={(e) => setNewEpicColor(e.target.value)}
-                      >
-                        <option value="purple">🟣 Purple</option>
-                        <option value="blue">🔵 Blue</option>
-                        <option value="teal">💠 Teal</option>
-                        <option value="green">🟢 Green</option>
-                        <option value="orange">🟠 Orange</option>
-                        <option value="red">🔴 Red</option>
-                      </select>
-                    </div>
-                  </>
+                  <div className="form-group">
+                    <label htmlFor="funcEpicColor">Epic Color</label>
+                    <select
+                      id="funcEpicColor"
+                      className="form-select"
+                      value={newEpicColor}
+                      onChange={(e) => setNewEpicColor(e.target.value)}
+                    >
+                      <option value="purple">🟣 Purple</option>
+                      <option value="blue">🔵 Blue</option>
+                      <option value="teal">💠 Teal</option>
+                      <option value="green">🟢 Green</option>
+                      <option value="orange">🟠 Orange</option>
+                      <option value="red">🔴 Red</option>
+                    </select>
+                  </div>
                 )}
 
-                {/* Parent Selection */}
+                {/* Task/FR/Design → Epic Link */}
                 {functionalWorkType !== 'Bug' && functionalWorkType !== 'Epic' && (
                   <div className="form-group">
-                    <label htmlFor="funcParent">Parent</label>
+                    <label htmlFor="funcParent">Epic Link</label>
                     <select
                       id="funcParent"
                       className="form-select"
                       value={functionalParentId}
                       onChange={(e) => setFunctionalParentId(e.target.value === '' ? '' : Number(e.target.value))}
                     >
-                      <option value="">Select parent</option>
-                      {(selectedProjectIdForCreation 
-                        ? projects.find(p => p.id === Number(selectedProjectIdForCreation))?.workItems || [] 
+                      <option value="">No Epic</option>
+                      {(selectedProjectIdForCreation
+                        ? projects.find((p: any) => p.id === Number(selectedProjectIdForCreation))?.workItems || []
                         : []
                       ).filter((item: any) => item.workType === 'Epic').map((item: any) => (
                         <option key={item.id} value={item.id}>
@@ -1298,63 +1436,75 @@ export default function EmployeeDashboard() {
                         </option>
                       ))}
                     </select>
+                    <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                      Link this item to an existing Epic.
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Due Date & Start Date Row */}
-              {functionalWorkType !== 'Bug' && (
-                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  {/* Due Date */}
-                  <div className="form-group">
-                    <label htmlFor="funcDueDate">Due date</label>
-                    <input
-                      id="funcDueDate"
-                      type="date"
-                      className="form-input"
-                      value={functionalDueDate}
-                      onChange={(e) => setFunctionalDueDate(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Start Date */}
-                  <div className="form-group">
-                    <label htmlFor="funcStartDate">Start date</label>
-                    <input
-                      id="funcStartDate"
-                      type="date"
-                      className="form-input"
-                      value={functionalStartDate}
-                      onChange={(e) => setFunctionalStartDate(e.target.value)}
-                    />
-                  </div>
+              {/* Epic → Epic Name (short label) */}
+              {functionalWorkType === 'Epic' && (
+                <div className="form-group">
+                  <label htmlFor="funcEpicName">Epic Name <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(short label shown on cards)</span></label>
+                  <input
+                    id="funcEpicName"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Auth Flow, Billing, Core UI…"
+                    value={newEpicName}
+                    onChange={(e) => setNewEpicName(e.target.value)}
+                  />
                 </div>
               )}
+
+              {/* Due Date & Start Date Row */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Due Date */}
+                <div className="form-group">
+                  <label htmlFor="funcDueDate">Due date</label>
+                  <input
+                    id="funcDueDate"
+                    type="date"
+                    className="form-input"
+                    value={functionalDueDate}
+                    onChange={(e) => setFunctionalDueDate(e.target.value)}
+                  />
+                </div>
+
+                {/* Start Date */}
+                <div className="form-group">
+                  <label htmlFor="funcStartDate">Start date</label>
+                  <input
+                    id="funcStartDate"
+                    type="date"
+                    className="form-input"
+                    value={functionalStartDate}
+                    onChange={(e) => setFunctionalStartDate(e.target.value)}
+                  />
+                  <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                    Allows the planned start date for a piece of work to be set.
+                  </span>
+                </div>
+              </div>
 
               {/* Labels & Team Row */}
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* Labels */}
-                {functionalWorkType !== 'Bug' ? (
-                  <div className="form-group">
-                    <label htmlFor="funcLabels">Labels</label>
-                    <select
-                      id="funcLabels"
-                      className="form-select"
-                      value={functionalLabel}
-                      onChange={(e) => setFunctionalLabel(e.target.value)}
-                    >
-                      <option value="">Select label</option>
-                      <option value="frontend">Frontend</option>
-                      <option value="backend">Backend</option>
-                      <option value="ui/ux">UI/UX</option>
-                      <option value="bugfix">Bugfix</option>
-                      <option value="database">Database</option>
-                      <option value="documentation">Documentation</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div></div> /* spacing spacer */
-                )}
+                <div className="form-group">
+                  <label htmlFor="funcLabels">Label</label>
+                  <select
+                    id="funcLabels"
+                    className="form-select"
+                    value={functionalLabel}
+                    onChange={(e) => setFunctionalLabel(e.target.value)}
+                  >
+                    <option value="">Select label</option>
+                    <option value="mobileapp">Mobile App</option>
+                    <option value="webapp">Web App</option>
+                    <option value="mobileapp/webapp">Mobile,Web App</option>
+                  </select>
+                </div>
 
                 {/* Team */}
                 <div className="form-group">
@@ -1371,6 +1521,9 @@ export default function EmployeeDashboard() {
                     <option value="QA Team">QA Team</option>
                     <option value="DevOps Team">DevOps Team</option>
                   </select>
+                  <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
+                    Associates a team to an issue. You can use this field to search.
+                  </span>
                 </div>
               </div>
 

@@ -2779,11 +2779,11 @@ export default function Projects() {
                       value={bugSeverity}
                       onChange={(e) => setBugSeverity(e.target.value)}
                     >
-                      <option value="1">1</option>
+                      <option value="1">1 (Highest)</option>
                       <option value="2">2</option>
                       <option value="3">3</option>
                       <option value="4">4</option>
-                      <option value="5">5</option>
+                      <option value="5">5 (Lowest)</option>
                     </select>
                   </div>
                 )}
@@ -2895,7 +2895,7 @@ export default function Projects() {
                     <option value="">Select label</option>
                     <option value="mobileapp">Mobile App</option>
                     <option value="webapp">Web App</option>
-                    <option value="mobileapp/webapp">Mobile/Web App</option>
+                    <option value="mobileapp/webapp">Mobile,Web App</option>
                   </select>
                 </div>
 
