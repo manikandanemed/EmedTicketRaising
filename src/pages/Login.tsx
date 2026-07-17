@@ -20,6 +20,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otp, setOtp] = useState('');
+  const [otpNeeded, setOtpNeeded] = useState(true);
 
   // Forgot password state
   const [forgotPasswordStep, setForgotPasswordStep] = useState<'none' | 'email' | 'otp'>('none');
@@ -90,14 +91,25 @@ export default function Login() {
     try {
       if (!showOtp) {
         const res = await api.login({ userName: email, password });
+        const roles = res.data?.roles || res.data?.Roles || [];
         if (res.success && res.data?.otpRequired) {
           setShowOtp(true);
-          const roles = res.data.roles || res.data.Roles || [];
+          setOtpNeeded(true);
           setAvailableRoles(roles);
           if (roles.length > 0) {
             setUserType(roles[0]);
           }
           toast.success(res.message || 'OTP sent to your email');
+        } else if (res.success && res.data?.roleSelectionRequired) {
+          // OTP-exempt account with more than one role: still needs a role choice,
+          // just without an OTP step.
+          setShowOtp(true);
+          setOtpNeeded(false);
+          setOtp('000000');
+          setAvailableRoles(roles);
+          if (roles.length > 0) {
+            setUserType(roles[0]);
+          }
         } else if (res.success) {
           login(res.data);
           navigate('/');
@@ -472,39 +484,56 @@ export default function Login() {
               </>
             ) : (
               <>
-                {/* OTP Message */}
-                <div style={{
-                  background: 'rgba(100,180,255,0.06)',
-                  border: '1px solid rgba(100,180,255,0.15)',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  marginBottom: '20px',
-                  fontSize: '0.88rem',
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.4
-                }}>
-                  An OTP has been sent to your email <strong>{email}</strong>. Please check your inbox and enter the 6-digit code.
-                </div>
+                {otpNeeded ? (
+                  <>
+                    {/* OTP Message */}
+                    <div style={{
+                      background: 'rgba(100,180,255,0.06)',
+                      border: '1px solid rgba(100,180,255,0.15)',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      marginBottom: '20px',
+                      fontSize: '0.88rem',
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1.4
+                    }}>
+                      An OTP has been sent to your email <strong>{email}</strong>. Please check your inbox and enter the 6-digit code.
+                    </div>
 
-                {/* OTP Code */}
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label htmlFor="otp">Enter Verification Code</label>
-                  <div style={{ position: 'relative' }}>
-                    <Shield size={16} style={{
-                      position: 'absolute', left: '14px', top: '50%',
-                      transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
-                    }} />
-                    <input
-                      id="otp" type="text" className="form-input"
-                      placeholder="123456"
-                      maxLength={6}
-                      style={{ paddingLeft: '42px', letterSpacing: '4px', fontSize: '1.1rem', fontWeight: 700 }}
-                      value={otp}
-                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                      required
-                    />
+                    {/* OTP Code */}
+                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                      <label htmlFor="otp">Enter Verification Code</label>
+                      <div style={{ position: 'relative' }}>
+                        <Shield size={16} style={{
+                          position: 'absolute', left: '14px', top: '50%',
+                          transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none',
+                        }} />
+                        <input
+                          id="otp" type="text" className="form-input"
+                          placeholder="123456"
+                          maxLength={6}
+                          style={{ paddingLeft: '42px', letterSpacing: '4px', fontSize: '1.1rem', fontWeight: 700 }}
+                          value={otp}
+                          onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    background: 'rgba(100,180,255,0.06)',
+                    border: '1px solid rgba(100,180,255,0.15)',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    marginBottom: '20px',
+                    fontSize: '0.88rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.4
+                  }}>
+                    Please select which role you'd like to log in as.
                   </div>
-                </div>
+                )}
 
                 {/* Dynamic Role Dropdown */}
                 {availableRoles.length > 1 ? (
@@ -580,10 +609,10 @@ export default function Login() {
                     borderRadius: '50%', animation: 'spin 0.8s linear infinite',
                     marginRight: '8px', verticalAlign: 'middle',
                   }} />
-                  {showOtp ? 'Verifying OTP...' : 'Signing in...'}
+                  {showOtp ? (otpNeeded ? 'Verifying OTP...' : 'Logging in...') : 'Signing in...'}
                 </>
               ) : (
-                <>{showOtp ? 'Verify OTP & Log In' : 'Sign In'} <ArrowRight size={16} style={{ marginLeft: '6px', verticalAlign: 'middle' }} /></>
+                <>{showOtp ? (otpNeeded ? 'Verify OTP & Log In' : 'Continue & Log In') : 'Sign In'} <ArrowRight size={16} style={{ marginLeft: '6px', verticalAlign: 'middle' }} /></>
               )}
             </button>
           </form>
