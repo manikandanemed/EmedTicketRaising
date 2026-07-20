@@ -989,6 +989,7 @@ export default function EmployeeDashboard() {
                       <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                       <th>Work</th>
                       <th>Project</th>
+                      <th>Module</th>
                       <th>Assignee</th>
                       <th>Reporter</th>
                       <th>Priority</th>
@@ -1031,6 +1032,11 @@ export default function EmployeeDashboard() {
                           <td>
                             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                               {item.projectName || '—'}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                              {item.moduleName || '—'}
                             </span>
                           </td>
                           <td>
@@ -1212,6 +1218,7 @@ export default function EmployeeDashboard() {
                     <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                     <th>Work</th>
                     <th>Project</th>
+                    <th>Module</th>
                     <th>Current Assignee</th>
                     <th>Reporter</th>
                     <th>Priority</th>
@@ -1253,6 +1260,11 @@ export default function EmployeeDashboard() {
                         <td>
                           <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                             {item.projectName || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            {item.moduleName || '—'}
                           </span>
                         </td>
                         <td>{renderUserAvatarAndName(item.assignedTo)}</td>

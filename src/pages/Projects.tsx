@@ -486,7 +486,9 @@ export default function Projects() {
         page: workItemPage,
         pageSize: WORK_ITEMS_PER_PAGE,
         status: workItemStatusFilters.length > 0 ? workItemStatusFilters.join(',') : undefined,
-        search: workItemSearchQuery || undefined
+        search: workItemSearchQuery || undefined,
+        assignedTo: workItemAssigneeFilter !== 'all' ? workItemAssigneeFilter : undefined,
+        dueDate: workItemDateFilter || undefined
       });
       if (res.success) {
         setWorkItems(res.data.items);
@@ -1132,12 +1134,12 @@ export default function Projects() {
     if (selectedProject) {
       fetchWorkItems(selectedProject.id);
     }
-  }, [selectedProject?.id, workItemPage, workItemStatusFilters, debouncedWorkItemSearchQuery]);
+  }, [selectedProject?.id, workItemPage, workItemStatusFilters, debouncedWorkItemSearchQuery, workItemAssigneeFilter, workItemDateFilter]);
 
   // Reset page to 1 on filter changes
   useEffect(() => {
     setWorkItemPage(1);
-  }, [debouncedWorkItemSearchQuery, workItemStatusFilters]);
+  }, [debouncedWorkItemSearchQuery, workItemStatusFilters, workItemAssigneeFilter, workItemDateFilter]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2018,6 +2020,7 @@ export default function Projects() {
                       <tr>
                         <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                         <th>Work</th>
+                        <th>Module</th>
                         <th>Assignee</th>
                         <th>Reporter</th>
                         <th>Priority</th>
@@ -2078,6 +2081,11 @@ export default function Projects() {
                                   </div>
                                 )}
                               </div>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                {item.moduleName || '—'}
+                              </span>
                             </td>
                             <td>
                               <select

@@ -407,12 +407,14 @@ export const api = {
     request<WorkItemDto[]>(`/api/project/${projectId}/workitems`),
 
   // Paginated + filtered project work items
-  getWorkItemsByProjectPaged: (projectId: number, params: { page?: number; pageSize?: number; status?: string; search?: string } = {}) => {
+  getWorkItemsByProjectPaged: (projectId: number, params: { page?: number; pageSize?: number; status?: string; search?: string; assignedTo?: string; dueDate?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.page)     q.set('page',     String(params.page));
-    if (params.pageSize) q.set('pageSize', String(params.pageSize));
-    if (params.status)   q.set('status',   params.status);
-    if (params.search)   q.set('search',   params.search);
+    if (params.page)       q.set('page',       String(params.page));
+    if (params.pageSize)   q.set('pageSize',   String(params.pageSize));
+    if (params.status)     q.set('status',     params.status);
+    if (params.search)     q.set('search',     params.search);
+    if (params.assignedTo) q.set('assignedTo', params.assignedTo);
+    if (params.dueDate)    q.set('dueDate',    params.dueDate);
     return request<PagedResult<WorkItemDto>>(`/api/project/${projectId}/workitems/paged?${q}`);
   },
 
