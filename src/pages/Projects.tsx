@@ -215,6 +215,52 @@ export default function Projects() {
     }
   };
 
+  const handleInlineDueDateChange = async (itemId: number, newDate: string) => {
+    if (!selectedProject) return;
+    const updatedWorkItems = workItems.map(w =>
+      w.id === itemId ? { ...w, dueDate: newDate || null } as any : w
+    );
+    setWorkItems(updatedWorkItems);
+
+    try {
+      const res = await api.updateWorkItemDueDate(itemId, newDate || null);
+      if (res.success) {
+        toast.success('Due date updated!');
+      } else {
+        toast.error(res.message || 'Failed to update due date');
+        fetchWorkItems(selectedProject.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating due date');
+      fetchWorkItems(selectedProject.id);
+    }
+  };
+
+  const handleInlineAssigneeChange = async (itemId: number, newAssigneeId: number | '') => {
+    if (!selectedProject) return;
+    const assignedEmployee = employees.find(e => e.id === newAssigneeId);
+    const updatedWorkItems = workItems.map(w =>
+      w.id === itemId
+        ? { ...w, assignedToUserId: newAssigneeId === '' ? null : newAssigneeId, assignedTo: newAssigneeId === '' ? null : (assignedEmployee?.name || w.assignedTo) } as any
+        : w
+    );
+    setWorkItems(updatedWorkItems);
+
+    try {
+      const res = await api.reassignWorkItem(itemId, newAssigneeId === '' ? null : Number(newAssigneeId));
+      if (res.success) {
+        toast.success('Task reassigned!');
+        fetchWorkItems(selectedProject.id);
+      } else {
+        toast.error(res.message || 'Failed to reassign task');
+        fetchWorkItems(selectedProject.id);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error reassigning task');
+      fetchWorkItems(selectedProject.id);
+    }
+  };
+
   const handleConfirmFixedBuild = async () => {
     if (!selectedProject || !pendingStatusItemId || !pendingStatusValue) return;
     const itemId = pendingStatusItemId;
@@ -472,6 +518,105 @@ export default function Projects() {
     return String(val);
   };
 
+  // Builds CSV row objects for a flat list of work items belonging to one project.
+  // Comments + bugs for every work item are fetched concurrently (not one-by-one)
+  // so export speed doesn't degrade linearly with the number of items.
+  const buildIssueRowsForWorkItems = async (items: WorkItemDto[], projectCode: string, projectName: string) => {
+    const perItemRows = await Promise.all(items.map(async (w) => {
+      const rows: any[] = [];
+
+      const [cmtRes, bugRes] = await Promise.all([
+        api.getCommentsByWorkItem(w.id).catch(() => null),
+        api.getBugsByWorkItem(w.id).catch(() => null)
+      ]);
+
+      let commentsText = '';
+      if (cmtRes && cmtRes.success && cmtRes.data.length > 0) {
+        commentsText = cmtRes.data
+          .map(c => `${c.postedBy} [${new Date(c.createdAt).toLocaleDateString()}]: ${c.message}`)
+          .join(' | ');
+      }
+
+      if (w.workType !== 'Bug') {
+        rows.push({
+          issueType: 'Task',
+          projectCode,
+          projectName,
+          issueNumber: w.workNumber,
+          title: w.title,
+          description: w.description || '',
+          status: w.status,
+          priority: w.priority,
+          assignedTo: w.assignedTo || 'Unassigned',
+          raisedBy: w.createdBy,
+          createdAt: new Date(w.createdAt).toLocaleDateString(),
+          dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
+          fixedAt: '',
+          closedAt: '',
+          parentIssue: '',
+          comments: commentsText
+        });
+      }
+
+      if (bugRes && bugRes.success && bugRes.data.length > 0) {
+        bugRes.data.forEach(b => {
+          rows.push({
+            issueType: 'Bug',
+            projectCode,
+            projectName,
+            issueNumber: b.bugNumber,
+            title: b.title,
+            description: b.description || '',
+            status: b.status,
+            priority: '',
+            assignedTo: b.assignedTo || 'Unassigned',
+            raisedBy: b.raisedBy,
+            createdAt: new Date(b.createdAt).toLocaleDateString(),
+            dueDate: '',
+            fixedAt: b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : '',
+            closedAt: b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '',
+            parentIssue: w.workNumber,
+            comments: ''
+          });
+        });
+      }
+
+      return rows;
+    }));
+
+    return perItemRows.flat();
+  };
+
+  const rowsToCsvContent = (allRows: any[]) => {
+    const headers = [
+      'Issue Type', 'Project Code', 'Project Name', 'Issue Number', 'Title',
+      'Description', 'Status', 'Priority', 'Assigned To', 'Raised By',
+      'Created On', 'Due Date', 'Fixed On', 'Closed On', 'Parent Issue', 'Comments'
+    ];
+    const csvRows = [
+      headers.join(','),
+      ...allRows.map(r => [
+        `"${safeStr(r.issueType)}"`,
+        `"${safeStr(r.projectCode).replace(/"/g, '""')}"`,
+        `"${safeStr(r.projectName).replace(/"/g, '""')}"`,
+        `"${safeStr(r.issueNumber).replace(/"/g, '""')}"`,
+        `"${safeStr(r.title).replace(/"/g, '""')}"`,
+        `"${safeStr(r.description).replace(/"/g, '""')}"`,
+        `"${safeStr(r.status).replace(/"/g, '""')}"`,
+        `"${safeStr(r.priority)}"`,
+        `"${safeStr(r.assignedTo).replace(/"/g, '""')}"`,
+        `"${safeStr(r.raisedBy).replace(/"/g, '""')}"`,
+        `"${safeStr(r.createdAt)}"`,
+        `"${safeStr(r.dueDate)}"`,
+        `"${safeStr(r.fixedAt)}"`,
+        `"${safeStr(r.closedAt)}"`,
+        `"${safeStr(r.parentIssue)}"`,
+        `"${safeStr(r.comments).replace(/"/g, '""')}"`
+      ].join(','))
+    ];
+    return '﻿' + csvRows.join('\n');
+  };
+
   const handleExportAllCSV = async () => {
     try {
       const res = await api.getAllProjects();
@@ -480,109 +625,23 @@ export default function Projects() {
         return;
       }
 
-      const allRows: any[] = [];
-
-      for (const p of res.data) {
-        if (p.workItems && Array.isArray(p.workItems)) {
-          for (const w of p.workItems) {
-            // Fetch comments for this work item
-            let commentsText = '';
-            try {
-              const cmtRes = await api.getCommentsByWorkItem(w.id);
-              if (cmtRes.success && cmtRes.data.length > 0) {
-                commentsText = cmtRes.data
-                  .map(c => `${c.postedBy} [${new Date(c.createdAt).toLocaleDateString()}]: ${c.message}`)
-                  .join(' | ');
-              }
-            } catch (_) {}
-
-            // Task row (skip if this work item is itself a Bug — it's exported once
-            // below as a Bug row instead, to avoid duplicate Task+Bug rows)
-            if (w.workType !== 'Bug') {
-              allRows.push({
-                issueType: 'Task',
-                projectCode: p.projectNumber,
-                projectName: p.name,
-                issueNumber: w.workNumber,
-                title: w.title,
-                description: w.description || '',
-                status: w.status,
-                priority: w.priority,
-                assignedTo: w.assignedTo || 'Unassigned',
-                raisedBy: w.createdBy,
-                createdAt: new Date(w.createdAt).toLocaleDateString(),
-                dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
-                fixedAt: '',
-                closedAt: '',
-                parentIssue: '',
-                comments: commentsText
-              });
-            }
-
-            // Fetch bugs for this work item
-            try {
-              const bugRes = await api.getBugsByWorkItem(w.id);
-              if (bugRes.success && bugRes.data.length > 0) {
-                bugRes.data.forEach(b => {
-                  allRows.push({
-                    issueType: 'Bug',
-                    projectCode: p.projectNumber,
-                    projectName: p.name,
-                    issueNumber: b.bugNumber,
-                    title: b.title,
-                    description: b.description || '',
-                    status: b.status,
-                    priority: '',
-                    assignedTo: b.assignedTo || 'Unassigned',
-                    raisedBy: b.raisedBy,
-                    createdAt: new Date(b.createdAt).toLocaleDateString(),
-                    dueDate: '',
-                    fixedAt: b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : '',
-                    closedAt: b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '',
-                    parentIssue: w.workNumber,
-                    comments: ''
-                  });
-                });
-              }
-            } catch (_) {}
-          }
-        }
-      }
+      // Build rows for every project's work items concurrently too — not just
+      // within a project — since projects are independent of each other.
+      const perProjectRows = await Promise.all(
+        res.data.map(p =>
+          p.workItems && Array.isArray(p.workItems)
+            ? buildIssueRowsForWorkItems(p.workItems, p.projectNumber, p.name)
+            : Promise.resolve([])
+        )
+      );
+      const allRows = perProjectRows.flat();
 
       if (allRows.length === 0) {
         toast.info('No tasks found to export.');
         return;
       }
 
-      const headers = [
-        'Issue Type', 'Project Code', 'Project Name', 'Issue Number', 'Title',
-        'Description', 'Status', 'Priority', 'Assigned To', 'Raised By',
-        'Created On', 'Due Date', 'Fixed On', 'Closed On', 'Parent Issue', 'Comments'
-      ];
-      const csvRows = [
-        headers.join(','),
-        ...allRows.map(r => [
-          `"${safeStr(r.issueType)}"`,
-          `"${safeStr(r.projectCode).replace(/"/g, '""')}"`,
-          `"${safeStr(r.projectName).replace(/"/g, '""')}"`,
-          `"${safeStr(r.issueNumber).replace(/"/g, '""')}"`,
-          `"${safeStr(r.title).replace(/"/g, '""')}"`,
-          `"${safeStr(r.description).replace(/"/g, '""')}"`,
-          `"${safeStr(r.status).replace(/"/g, '""')}"`,
-          `"${safeStr(r.priority)}"`,
-          `"${safeStr(r.assignedTo).replace(/"/g, '""')}"`,
-          `"${safeStr(r.raisedBy).replace(/"/g, '""')}"`,
-          `"${safeStr(r.createdAt)}"`,
-          `"${safeStr(r.dueDate)}"`,
-          `"${safeStr(r.fixedAt)}"`,
-          `"${safeStr(r.closedAt)}"`,
-          `"${safeStr(r.parentIssue)}"`,
-          `"${safeStr(r.comments).replace(/"/g, '""')}"`
-        ].join(','))
-      ];
-
-      const csvContent = '\uFEFF' + csvRows.join('\n');
-      downloadCSV('teamtrack_all_issues_export.csv', csvContent);
+      downloadCSV('teamtrack_all_issues_export.csv', rowsToCsvContent(allRows));
     } catch (err: any) {
       toast.error('Failed to export CSV: ' + err.message);
     }
@@ -628,105 +687,14 @@ export default function Projects() {
         return;
       }
 
-      const allRows: any[] = [];
-
-      for (const w of itemsToExport) {
-        // Fetch comments for this work item
-        let commentsText = '';
-        try {
-          const cmtRes = await api.getCommentsByWorkItem(w.id);
-          if (cmtRes.success && cmtRes.data.length > 0) {
-            commentsText = cmtRes.data
-              .map(c => `${c.postedBy} [${new Date(c.createdAt).toLocaleDateString()}]: ${c.message}`)
-              .join(' | ');
-          }
-        } catch (_) {}
-
-        // Task row (skip if this work item is itself a Bug — it's exported once
-        // below as a Bug row instead, to avoid duplicate Task+Bug rows)
-        if (w.workType !== 'Bug') {
-          allRows.push({
-            issueType: 'Task',
-            projectCode: selectedProject.projectNumber,
-            projectName: selectedProject.name,
-            issueNumber: w.workNumber,
-            title: w.title,
-            description: w.description || '',
-            status: w.status,
-            priority: w.priority,
-            assignedTo: w.assignedTo || 'Unassigned',
-            raisedBy: w.createdBy,
-            createdAt: new Date(w.createdAt).toLocaleDateString(),
-            dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
-            fixedAt: '',
-            closedAt: '',
-            parentIssue: '',
-            comments: commentsText
-          });
-        }
-
-        // Fetch bugs for this work item
-        try {
-          const bugRes = await api.getBugsByWorkItem(w.id);
-          if (bugRes.success && bugRes.data.length > 0) {
-            bugRes.data.forEach(b => {
-              allRows.push({
-                issueType: 'Bug',
-                projectCode: selectedProject.projectNumber,
-                projectName: selectedProject.name,
-                issueNumber: b.bugNumber,
-                title: b.title,
-                description: b.description || '',
-                status: b.status,
-                priority: '',
-                assignedTo: b.assignedTo || 'Unassigned',
-                raisedBy: b.raisedBy,
-                createdAt: new Date(b.createdAt).toLocaleDateString(),
-                dueDate: '',
-                fixedAt: b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : '',
-                closedAt: b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '',
-                parentIssue: w.workNumber,
-                comments: ''
-              });
-            });
-          }
-        } catch (_) {}
-      }
+      const allRows = await buildIssueRowsForWorkItems(itemsToExport, selectedProject.projectNumber, selectedProject.name);
 
       if (allRows.length === 0) {
         toast.info('No issues found to export for this project.');
         return;
       }
 
-      const headers = [
-        'Issue Type', 'Project Code', 'Project Name', 'Issue Number', 'Title',
-        'Description', 'Status', 'Priority', 'Assigned To', 'Raised By',
-        'Created On', 'Due Date', 'Fixed On', 'Closed On', 'Parent Issue', 'Comments'
-      ];
-      const csvRows = [
-        headers.join(','),
-        ...allRows.map(r => [
-          `"${safeStr(r.issueType)}"`,
-          `"${safeStr(r.projectCode).replace(/"/g, '""')}"`,
-          `"${safeStr(r.projectName).replace(/"/g, '""')}"`,
-          `"${safeStr(r.issueNumber).replace(/"/g, '""')}"`,
-          `"${safeStr(r.title).replace(/"/g, '""')}"`,
-          `"${safeStr(r.description).replace(/"/g, '""')}"`,
-          `"${safeStr(r.status).replace(/"/g, '""')}"`,
-          `"${safeStr(r.priority)}"`,
-          `"${safeStr(r.assignedTo).replace(/"/g, '""')}"`,
-          `"${safeStr(r.raisedBy).replace(/"/g, '""')}"`,
-          `"${safeStr(r.createdAt)}"`,
-          `"${safeStr(r.dueDate)}"`,
-          `"${safeStr(r.fixedAt)}"`,
-          `"${safeStr(r.closedAt)}"`,
-          `"${safeStr(r.parentIssue)}"`,
-          `"${safeStr(r.comments).replace(/"/g, '""')}"`
-        ].join(','))
-      ];
-
-      const csvContent = '\uFEFF' + csvRows.join('\n');
-      downloadCSV(`teamtrack_${selectedProject.projectNumber}_issues_export.csv`, csvContent);
+      downloadCSV(`teamtrack_${selectedProject.projectNumber}_issues_export.csv`, rowsToCsvContent(allRows));
     } catch (err: any) {
       toast.error('Failed to export project CSV: ' + err.message);
     }
@@ -2111,7 +2079,26 @@ export default function Projects() {
                                 )}
                               </div>
                             </td>
-                            <td>{renderUserAvatarAndName(item.assignedTo)}</td>
+                            <td>
+                              <select
+                                className="form-select"
+                                value={item.assignedToUserId ?? ''}
+                                onChange={(e) => handleInlineAssigneeChange(item.id, e.target.value === '' ? '' : Number(e.target.value))}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '0.82rem',
+                                  width: 'auto',
+                                  minWidth: '130px',
+                                  height: 'auto',
+                                  borderRadius: '4px'
+                                }}
+                              >
+                                <option value="">Unassigned</option>
+                                {employees.map((emp) => (
+                                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                ))}
+                              </select>
+                            </td>
                             <td>{renderUserAvatarAndName(item.createdBy)}</td>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2194,7 +2181,15 @@ export default function Projects() {
                             </td>
                             <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                             <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                            <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
+                            <td>
+                              <input
+                                type="date"
+                                className="form-input"
+                                value={item.dueDate ? item.dueDate.substring(0, 10) : ''}
+                                onChange={(e) => handleInlineDueDateChange(item.id, e.target.value)}
+                                style={{ padding: '4px 8px', fontSize: '0.82rem', width: 'auto', height: 'auto', borderRadius: '4px' }}
+                              />
+                            </td>
                             <td style={{ textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                 <button
@@ -2206,7 +2201,7 @@ export default function Projects() {
                                 >
                                   View
                                 </button>
-                                {item.createdByUserId === user?.userId && (
+                                {(isPM || item.createdByUserId === user?.userId) && (
                                   <>
                                     <button
                                       type="button"
