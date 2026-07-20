@@ -97,6 +97,100 @@ export default function EmployeeDashboard() {
   const [selectedFixedBuild, setSelectedFixedBuild] = useState('');
   const [modalBuildOptions, setModalBuildOptions] = useState<{ buildNumber: string }[]>([]);
 
+  // ==================== EDIT TASK (own tasks only — mirrors PM's Projects.tsx) ====================
+  const [showEditTask, setShowEditTask] = useState(false);
+  const [editingWorkItem, setEditingWorkItem] = useState<WorkItemDto | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDesc, setEditTaskDesc] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [editTaskAssignedId, setEditTaskAssignedId] = useState<number | ''>('');
+  const [editTaskStatus, setEditTaskStatus] = useState('');
+  const [editTaskDueDate, setEditTaskDueDate] = useState('');
+  const [editTaskLabels, setEditTaskLabels] = useState('');
+  const [editTaskTeam, setEditTaskTeam] = useState('');
+  const [editTaskRaisedBuild, setEditTaskRaisedBuild] = useState('');
+  const [editTaskFixedBuild, setEditTaskFixedBuild] = useState('');
+  const [editTaskSeverity, setEditTaskSeverity] = useState('');
+  const [editTaskIssueType, setEditTaskIssueType] = useState('');
+  const [savingEditTask, setSavingEditTask] = useState(false);
+  const [editBuildsOptions, setEditBuildsOptions] = useState<{ buildNumber: string }[]>([]);
+
+  const handleOpenEditTask = async (item: WorkItemDto) => {
+    setEditingWorkItem(item);
+    setEditTaskTitle(item.title || '');
+    setEditTaskDesc(item.description || '');
+    setEditTaskPriority((item.priority as any) || 'medium');
+    setEditTaskAssignedId(item.assignedToUserId || '');
+    setEditTaskStatus(item.status || '');
+    setEditTaskDueDate(item.dueDate ? item.dueDate.substring(0, 10) : '');
+    setEditTaskLabels(item.labels || '');
+    setEditTaskTeam(item.team || '');
+    setEditTaskRaisedBuild(item.raisedBuild || '');
+    setEditTaskFixedBuild(item.fixedBuild || '');
+    setEditTaskSeverity(item.severity || '3');
+    setEditTaskIssueType(item.issueType || 'New');
+    try {
+      const buildsRes = await api.getBuildsByProject(item.projectId);
+      if (buildsRes.success) setEditBuildsOptions(buildsRes.data);
+    } catch (_) {}
+    setShowEditTask(true);
+  };
+
+  const handleSaveEditTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWorkItem) return;
+    if (!editTaskTitle.trim()) { toast.error('Title is required'); return; }
+    setSavingEditTask(true);
+    try {
+      const res = await api.updateWorkItem(editingWorkItem.id, {
+        title: editTaskTitle.trim(),
+        description: editTaskDesc.trim() || null,
+        priority: editTaskPriority,
+        assignedToUserId: editTaskAssignedId === '' ? null : Number(editTaskAssignedId),
+        status: editTaskStatus || undefined,
+        dueDate: editTaskDueDate || null,
+        labels: editTaskLabels || null,
+        team: editTaskTeam || null,
+        raisedBuild: editTaskRaisedBuild.trim() || null,
+        fixedBuild: editTaskFixedBuild.trim() || null,
+        severity: editTaskSeverity || null,
+        issueType: editTaskIssueType || null,
+        workType: editingWorkItem.workType,
+        parentId: editingWorkItem.parentId || null,
+        epicName: editingWorkItem.epicName || null,
+        epicColor: editingWorkItem.epicColor || null,
+        attachmentUrls: editingWorkItem.attachmentUrls || null,
+        moduleId: editingWorkItem.moduleId || null,
+      });
+      if (res.success) {
+        toast.success('Task updated successfully!');
+        setShowEditTask(false);
+        fetchTasks();
+      } else {
+        toast.error(res.message || 'Failed to update task');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update task');
+    } finally {
+      setSavingEditTask(false);
+    }
+  };
+
+  const handleDeleteTaskFromList = async (workItemId: number) => {
+    if (!window.confirm('Delete this task? This action cannot be undone.')) return;
+    try {
+      const res = await api.deleteWorkItem(workItemId);
+      if (res.success) {
+        toast.success('Task deleted successfully!');
+        fetchTasks();
+      } else {
+        toast.error(res.message || 'Failed to delete task');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete task');
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -276,6 +370,44 @@ export default function EmployeeDashboard() {
     }
   };
 
+  const handleInlineDueDateChange = async (taskId: number, newDate: string) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, dueDate: newDate || null } as any : t));
+    try {
+      const res = await api.updateWorkItemDueDate(taskId, newDate || null);
+      if (res.success) {
+        toast.success('Due date updated!');
+      } else {
+        toast.error(res.message || 'Failed to update due date');
+        fetchTasks();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating due date');
+      fetchTasks();
+    }
+  };
+
+  const handleInlineAssigneeChange = async (taskId: number, newAssigneeId: number | '') => {
+    const assignedEmployee = employees.find((e: any) => e.id === newAssigneeId);
+    setTasks(prev => prev.map(t =>
+      t.id === taskId
+        ? { ...t, assignedToUserId: newAssigneeId === '' ? null : newAssigneeId, assignedTo: newAssigneeId === '' ? null : (assignedEmployee?.name || t.assignedTo) } as any
+        : t
+    ));
+    try {
+      const res = await api.reassignWorkItem(taskId, newAssigneeId === '' ? null : Number(newAssigneeId));
+      if (res.success) {
+        toast.success('Task reassigned!');
+        fetchTasks();
+      } else {
+        toast.error(res.message || 'Failed to reassign task');
+        fetchTasks();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error reassigning task');
+      fetchTasks();
+    }
+  };
+
   const handleConfirmFixedBuild = async () => {
     if (!pendingStatusItemId || !pendingStatusValue) return;
     const taskId = pendingStatusItemId;
@@ -345,52 +477,140 @@ export default function EmployeeDashboard() {
     return String(val);
   };
 
-  const handleExportCSV = () => {
-    if (tasks.length === 0) {
-      toast.info('No data found to export.');
+  // Builds CSV row objects for a flat list of work items belonging to one project.
+  // Shared by both the "export all my projects" and "export one selected project" flows.
+  // Comments + bugs for every work item are fetched concurrently (not one-by-one)
+  // so export speed doesn't degrade linearly with the number of items.
+  const buildIssueRowsForWorkItems = async (items: WorkItemDto[], projectCode: string, projectName: string) => {
+    const perItemRows = await Promise.all(items.map(async (w) => {
+      const rows: any[] = [];
+
+      const [cmtRes, bugRes] = await Promise.all([
+        api.getCommentsByWorkItem(w.id).catch(() => null),
+        api.getBugsByWorkItem(w.id).catch(() => null)
+      ]);
+
+      let commentsText = '';
+      if (cmtRes && cmtRes.success && cmtRes.data.length > 0) {
+        commentsText = cmtRes.data
+          .map(c => `${c.postedBy} [${new Date(c.createdAt).toLocaleDateString()}]: ${c.message}`)
+          .join(' | ');
+      }
+
+      // Task row (skip if this work item is itself a Bug — it's exported once
+      // below as a Bug row instead, to avoid duplicate Task+Bug rows)
+      if (w.workType !== 'Bug') {
+        rows.push({
+          issueType: 'Task',
+          projectCode,
+          projectName,
+          issueNumber: w.workNumber,
+          title: w.title,
+          description: w.description || '',
+          status: w.status,
+          priority: w.priority,
+          assignedTo: w.assignedTo || 'Unassigned',
+          raisedBy: w.createdBy,
+          createdAt: new Date(w.createdAt).toLocaleDateString(),
+          dueDate: w.dueDate ? new Date(w.dueDate).toLocaleDateString() : '',
+          fixedAt: '',
+          closedAt: '',
+          parentIssue: '',
+          comments: commentsText
+        });
+      }
+
+      if (bugRes && bugRes.success && bugRes.data.length > 0) {
+        bugRes.data.forEach(b => {
+          rows.push({
+            issueType: 'Bug',
+            projectCode,
+            projectName,
+            issueNumber: b.bugNumber,
+            title: b.title,
+            description: b.description || '',
+            status: b.status,
+            priority: '',
+            assignedTo: b.assignedTo || 'Unassigned',
+            raisedBy: b.raisedBy,
+            createdAt: new Date(b.createdAt).toLocaleDateString(),
+            dueDate: '',
+            fixedAt: b.fixedAt ? new Date(b.fixedAt).toLocaleDateString() : '',
+            closedAt: b.closedAt ? new Date(b.closedAt).toLocaleDateString() : '',
+            parentIssue: w.workNumber,
+            comments: ''
+          });
+        });
+      }
+
+      return rows;
+    }));
+
+    return perItemRows.flat();
+  };
+
+  const rowsToCsvContent = (allRows: any[]) => {
+    const headers = [
+      'Issue Type', 'Project Code', 'Project Name', 'Issue Number', 'Title',
+      'Description', 'Status', 'Priority', 'Assigned To', 'Raised By',
+      'Created On', 'Due Date', 'Fixed On', 'Closed On', 'Parent Issue', 'Comments'
+    ];
+    const csvRows = [
+      headers.join(','),
+      ...allRows.map(r => [
+        `"${safeStr(r.issueType)}"`,
+        `"${safeStr(r.projectCode).replace(/"/g, '""')}"`,
+        `"${safeStr(r.projectName).replace(/"/g, '""')}"`,
+        `"${safeStr(r.issueNumber).replace(/"/g, '""')}"`,
+        `"${safeStr(r.title).replace(/"/g, '""')}"`,
+        `"${safeStr(r.description).replace(/"/g, '""')}"`,
+        `"${safeStr(r.status).replace(/"/g, '""')}"`,
+        `"${safeStr(r.priority)}"`,
+        `"${safeStr(r.assignedTo).replace(/"/g, '""')}"`,
+        `"${safeStr(r.raisedBy).replace(/"/g, '""')}"`,
+        `"${safeStr(r.createdAt)}"`,
+        `"${safeStr(r.dueDate)}"`,
+        `"${safeStr(r.fixedAt)}"`,
+        `"${safeStr(r.closedAt)}"`,
+        `"${safeStr(r.parentIssue)}"`,
+        `"${safeStr(r.comments).replace(/"/g, '""')}"`
+      ].join(','))
+    ];
+    return '﻿' + csvRows.join('\n');
+  };
+
+  // Exports issues for a single project the employee selects — mirrors PM's
+  // per-project "Export CSV" in Projects.tsx. Backend rejects (403) if this
+  // employee isn't actually assigned to the chosen project.
+  const [exportProjectId, setExportProjectId] = useState<number | ''>('');
+  const [exportingProject, setExportingProject] = useState(false);
+
+  const handleExportSelectedProjectCSV = async () => {
+    if (!exportProjectId) {
+      toast.error('Please select a project to export');
       return;
     }
+    const project = projects.find((p: any) => p.id === exportProjectId);
+    setExportingProject(true);
+    try {
+      const itemsRes = await api.getWorkItemsByProject(Number(exportProjectId));
+      if (!itemsRes.success) {
+        toast.error(itemsRes.message || "You don't have access to this project");
+        return;
+      }
 
-    // Combined headers covering both tasks and bugs
-    const headers = [
-      'Type',
-      'Number',
-      'Title',
-      'Description',
-      'Status',
-      'Priority',
-      'Project Name',
-      'Project Code',
-      'Assigned To',
-      'Raised By / Created By',
-      'Created On',
-      'Due Date'
-    ];
+      const rows = await buildIssueRowsForWorkItems(itemsRes.data, project?.projectNumber || '', project?.name || '');
+      if (rows.length === 0) {
+        toast.info('No issues found to export for this project.');
+        return;
+      }
 
-    const q = (val: any) => `"${safeStr(val).replace(/"/g, '""')}"`;
-
-    const rows: string[] = [headers.join(',')];
-
-    // For each work item, add a row
-    tasks.forEach(t => {
-      rows.push([
-        q(t.workType || 'Task'),
-        q(t.workNumber),
-        q(t.title),
-        q(t.description),
-        q(t.status),
-        q(t.priority),
-        q(t.projectName),
-        q(t.projectNumber),
-        q(t.assignedTo || user?.name || ''),
-        q(t.createdBy),
-        q(new Date(t.createdAt).toLocaleDateString()),
-        q(t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '')
-      ].join(','));
-    });
-
-    const csvContent = rows.join('\n');
-    downloadCSV('my_work_items.csv', csvContent);
+      downloadCSV(`${project?.projectNumber || 'project'}_issues_export.csv`, rowsToCsvContent(rows));
+    } catch (err: any) {
+      toast.error(err.message || "You don't have access to this project");
+    } finally {
+      setExportingProject(false);
+    }
   };
 
   useEffect(() => {
@@ -464,15 +684,35 @@ export default function EmployeeDashboard() {
           <h1>My Work Queue</h1>
           <p style={{ color: 'var(--text-muted)' }}>Your assigned tasks and bugs — all in one place.</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn btn-primary" onClick={() => { setShowCreateFunctional(true); setCreateAnother(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <PlusCircle size={18} />
             Create
           </button>
-          <button className="btn btn-secondary" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Download size={18} />
-            Export CSV
-          </button>
+          {/* Export one specific assigned project */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <select
+              className="form-select"
+              value={exportProjectId}
+              onChange={(e) => setExportProjectId(e.target.value === '' ? '' : Number(e.target.value))}
+              style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '160px' }}
+            >
+              <option value="">Select project…</option>
+              {projects.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
+              ))}
+            </select>
+            <button
+              className="btn btn-secondary"
+              onClick={handleExportSelectedProjectCSV}
+              disabled={!exportProjectId || exportingProject}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Download size={18} />
+              {exportingProject ? 'Exporting…' : 'Export Project'}
+            </button>
+          </div>
+
           <button className="btn btn-secondary" onClick={fetchData}>
             Sync Work
           </button>
@@ -758,6 +998,7 @@ export default function EmployeeDashboard() {
                       <th>Created</th>
                       <th>Updated</th>
                       <th>Due Date</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -792,7 +1033,26 @@ export default function EmployeeDashboard() {
                               {item.projectName || '—'}
                             </span>
                           </td>
-                          <td>{renderUserAvatarAndName(user?.name)}</td>
+                          <td>
+                            <select
+                              className="form-select"
+                              value={item.assignedToUserId ?? ''}
+                              onChange={(e) => handleInlineAssigneeChange(item.id, e.target.value === '' ? '' : Number(e.target.value))}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '0.82rem',
+                                width: 'auto',
+                                minWidth: '130px',
+                                height: 'auto',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              <option value="">Unassigned</option>
+                              {employees.map((emp: any) => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                              ))}
+                            </select>
+                          </td>
                           <td>{renderUserAvatarAndName(item.createdBy)}</td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -849,7 +1109,50 @@ export default function EmployeeDashboard() {
                           </td>
                           <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                           <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                          <td>{item.dueDate ? new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
+                          <td>
+                            <input
+                              type="date"
+                              className="form-input"
+                              value={item.dueDate ? item.dueDate.substring(0, 10) : ''}
+                              onChange={(e) => handleInlineDueDateChange(item.id, e.target.value)}
+                              style={{ padding: '4px 8px', fontSize: '0.82rem', width: 'auto', height: 'auto', borderRadius: '4px' }}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => navigate(`/workitems/${item.id}`)}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="View details"
+                              >
+                                View
+                              </button>
+                              {item.createdByUserId === user?.userId && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => handleOpenEditTask(item)}
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Edit task"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={() => handleDeleteTaskFromList(item.id)}
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    title="Delete task"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1681,6 +1984,198 @@ export default function EmployeeDashboard() {
                     {creatingWorkItem && submissionType === 'standard' ? 'Creating...' : 'Create'}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* EDIT TASK MODAL (own tasks only) */}
+      {showEditTask && editingWorkItem && createPortal(
+        <div className="modal-overlay" onClick={() => setShowEditTask(false)}>
+          <div
+            className="modal-content glass-panel"
+            style={{ maxWidth: '620px', width: '96%', padding: '0', borderRadius: '16px', overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.06))', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)' }}>Edit Task</h3>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>{editingWorkItem.workNumber} · {editingWorkItem.workType}</div>
+              </div>
+              <button className="modal-close" onClick={() => setShowEditTask(false)}><X size={20} /></button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEditTask} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '75vh', overflowY: 'auto' }}>
+
+              {/* Title */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  className="form-input"
+                  value={editTaskTitle}
+                  onChange={e => setEditTaskTitle(e.target.value)}
+                  placeholder="Task title"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description</label>
+                <textarea
+                  className="form-input"
+                  value={editTaskDesc}
+                  onChange={e => setEditTaskDesc(e.target.value)}
+                  placeholder="Task description"
+                  rows={3}
+                  style={{ resize: 'vertical', minHeight: '72px' }}
+                />
+              </div>
+
+              {/* Priority + Status */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</label>
+                  <select className="form-select" value={editTaskPriority} onChange={e => setEditTaskPriority(e.target.value as any)}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</label>
+                  <select className="form-select" value={editTaskStatus} onChange={e => setEditTaskStatus(e.target.value)}>
+                    <option value="pending">Pending</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="closed">Closed</option>
+                    <option value="reopened">Reopened</option>
+                    <option value="future_release">Future Release</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Assigned To + Due Date */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assigned To</label>
+                  <select className="form-select" value={editTaskAssignedId} onChange={e => setEditTaskAssignedId(e.target.value === '' ? '' : Number(e.target.value))}>
+                    <option value="">-- Unassigned --</option>
+                    {employees.map((emp: any) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due Date</label>
+                  <input type="date" className="form-input" value={editTaskDueDate} onChange={e => setEditTaskDueDate(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Labels + Team */}
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Labels</label>
+                  <input className="form-input" value={editTaskLabels} onChange={e => setEditTaskLabels(e.target.value)} placeholder="e.g. frontend, api" />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Team</label>
+                  <input className="form-input" value={editTaskTeam} onChange={e => setEditTaskTeam(e.target.value)} placeholder="e.g. Backend Team" />
+                </div>
+              </div>
+
+              {/* Bug-specific fields */}
+              {editingWorkItem.workType === 'Bug' && (
+                <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Severity</label>
+                    <select className="form-select" value={editTaskSeverity} onChange={e => setEditTaskSeverity(e.target.value)}>
+                      <option value="1">1 (Highest)</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5 (Lowest)</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Issue Type</label>
+                    <select className="form-select" value={editTaskIssueType} onChange={e => setEditTaskIssueType(e.target.value)}>
+                      <option value="New">New</option>
+                      <option value="Reopen">Reopen</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Raised Build */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fb923c' }}>Raised Build Number</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    value={editBuildsOptions.some(b => b.buildNumber === editTaskRaisedBuild) ? editTaskRaisedBuild : ''}
+                    onChange={e => { if (e.target.value) setEditTaskRaisedBuild(e.target.value); }}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">-- Select Build --</option>
+                    {editBuildsOptions.map(b => (
+                      <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="form-input"
+                    value={editTaskRaisedBuild}
+                    onChange={e => setEditTaskRaisedBuild(e.target.value)}
+                    placeholder="or type custom"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                {editTaskRaisedBuild && (
+                  <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#fb923c' }}>🟠 {editTaskRaisedBuild}</div>
+                )}
+              </div>
+
+              {/* Fixed Build */}
+              <div className="form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#34d399' }}>Fixed Build Number</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    value={editBuildsOptions.some(b => b.buildNumber === editTaskFixedBuild) ? editTaskFixedBuild : ''}
+                    onChange={e => { if (e.target.value) setEditTaskFixedBuild(e.target.value); }}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">-- Select Build --</option>
+                    {editBuildsOptions.map(b => (
+                      <option key={b.buildNumber} value={b.buildNumber}>{b.buildNumber}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="form-input"
+                    value={editTaskFixedBuild}
+                    onChange={e => setEditTaskFixedBuild(e.target.value)}
+                    placeholder="or type custom"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                {editTaskFixedBuild && (
+                  <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#34d399' }}>🟢 {editTaskFixedBuild}</div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditTask(false)} disabled={savingEditTask}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={savingEditTask} style={{ minWidth: '100px' }}>
+                  {savingEditTask ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </form>
           </div>
