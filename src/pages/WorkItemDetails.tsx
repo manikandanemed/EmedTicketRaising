@@ -569,7 +569,7 @@ export default function WorkItemDetails() {
 
             {/* Attachments Section */}
             {workItem.attachmentUrls && (
-              <div style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
+              <div style={{ marginBottom: '24px', background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '10px' }}>
                   Attachments
                 </span>
@@ -586,7 +586,7 @@ export default function WorkItemDetails() {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
-                          background: 'rgba(255, 255, 255, 0.05)',
+                          background: '#F8FAFC',
                           border: '1px solid var(--border-soft)',
                           borderRadius: '6px',
                           padding: '8px 12px',
@@ -596,8 +596,8 @@ export default function WorkItemDetails() {
                           fontWeight: 500,
                           transition: 'background-color 0.2s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#F8FAFC'}
                       >
                         <span>📎</span>
                         <span>{fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName}</span>
@@ -623,7 +623,7 @@ export default function WorkItemDetails() {
           {/* Action Pane */}
           <div style={{
             width: '280px',
-            background: 'rgba(0,0,0,0.2)',
+            background: 'var(--bg-app)',
             padding: '24px',
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-soft)',
@@ -1284,7 +1284,7 @@ export default function WorkItemDetails() {
                 >
                   <FileImage size={32} style={{ margin: '0 auto 10px auto', display: 'block', color: 'var(--primary)' }} />
                   {bugScreenshot ? (
-                    <span style={{ color: '#fff', fontWeight: 600 }}>{bugScreenshot.name}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{bugScreenshot.name}</span>
                   ) : (
                     <span>Click here to select an image file</span>
                   )}
@@ -1372,8 +1372,8 @@ export default function WorkItemDetails() {
               maxWidth: '450px', 
               padding: '24px', 
               borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              background: 'rgba(20, 20, 25, 0.92)'
+              border: '1px solid var(--border-soft)',
+              background: '#FFFFFF'
             }}
           >
             <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
@@ -1390,10 +1390,10 @@ export default function WorkItemDetails() {
                 <AlertCircle size={22} style={{ color: customConfirm.isDanger ? '#ef4444' : '#8b5cf6' }} />
               </div>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {customConfirm.title}
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.92rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   {customConfirm.message}
                 </p>
               </div>

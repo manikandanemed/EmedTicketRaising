@@ -486,7 +486,7 @@ export default function EmployeeDashboard() {
             <h3>Pending Tasks</h3>
             <p>{pendingTasks}</p>
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(100, 116, 139, 0.15)', color: 'var(--text-muted)' }}>
             <Clock size={24} />
           </div>
         </div>
@@ -723,7 +723,7 @@ export default function EmployeeDashboard() {
         <span style={{ fontWeight: 700, fontSize: '1rem' }}>
           My Work Items
         </span>
-        <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
+        <span style={{ background: 'var(--primary-glow)', color: 'var(--primary-hover)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
           {tasksTotalCount} items
         </span>
       </div>
@@ -895,7 +895,7 @@ export default function EmployeeDashboard() {
             <span style={{ fontWeight: 700, fontSize: '1rem' }}>
               Previously Worked On
             </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
+            <span style={{ background: 'var(--primary-glow)', color: 'var(--primary-hover)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
               {involvedTasks.length} items
             </span>
           </div>
@@ -1055,12 +1055,12 @@ export default function EmployeeDashboard() {
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
         <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ maxWidth: '680px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
             <button className="modal-close" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
               <X size={24} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Work Item</h2>
+            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.3rem' }} className="gradient-text">Create Work Item</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

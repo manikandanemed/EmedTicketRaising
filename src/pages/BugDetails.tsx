@@ -254,7 +254,7 @@ export default function BugDetails() {
                 </div>
               </div>
               {workItem.description && (
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)', padding: '14px', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '14px' }}>
+                <div style={{ background: '#F8FAFC', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-sm)', padding: '14px', fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '14px' }}>
                   {workItem.description}
                 </div>
               )}
@@ -290,7 +290,7 @@ export default function BugDetails() {
                 <div style={{
                   position: 'absolute', top: '8px', right: '8px',
                   background: 'rgba(0,0,0,0.6)', borderRadius: '6px',
-                  padding: '4px 8px', fontSize: '0.75rem',
+                  padding: '4px 8px', fontSize: '0.75rem', color: '#FFFFFF',
                   display: 'flex', alignItems: 'center', gap: '4px'
                 }}>
                   <Eye size={12} /> Click to expand
@@ -333,7 +333,8 @@ export default function BugDetails() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {comments.map(c => (
                   <div key={c.id} style={{
-                    background: 'rgba(255,255,255,0.03)',
+                    background: '#FFFFFF',
+                    border: '1px solid var(--border-soft)',
                     borderRadius: 'var(--radius-sm)',
                     padding: '14px',
                     borderLeft: '3px solid var(--primary)'
@@ -375,8 +376,8 @@ export default function BugDetails() {
                   style={{
                     padding: '12px 16px',
                     borderRadius: 'var(--radius-sm)',
-                    border: `2px solid ${bug.status === s.key ? s.color : 'rgba(255,255,255,0.08)'}`,
-                    background: bug.status === s.key ? `${s.color}20` : 'rgba(255,255,255,0.03)',
+                    border: `2px solid ${bug.status === s.key ? s.color : 'var(--border-soft)'}`,
+                    background: bug.status === s.key ? `${s.color}20` : '#F8FAFC',
                     color: bug.status === s.key ? s.color : 'var(--text-muted)',
                     cursor: bug.status === s.key || updatingStatus ? 'default' : 'pointer',
                     fontWeight: bug.status === s.key ? 700 : 500,

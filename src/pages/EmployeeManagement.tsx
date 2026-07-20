@@ -229,7 +229,7 @@ export default function EmployeeManagement() {
               <div className="employee-card-header">
                 <div
                   className="employee-card-avatar"
-                  style={emp.isActive ? {} : { background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.1)', boxShadow: 'none' }}
+                  style={emp.isActive ? {} : { background: '#F1F5F9', border: '2px solid var(--border-soft)', boxShadow: 'none', color: 'var(--text-secondary)' }}
                 >
                   {getInitials(emp.name)}
                 </div>
@@ -243,7 +243,7 @@ export default function EmployeeManagement() {
                                     emp.userType === 'ProductManager' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)',
                         color: emp.userType === 'Both' ? 'var(--accent)' :
                                emp.userType === 'ProductManager' ? '#a78bfa' : 'var(--primary-hover)',
-                        fontSize: '0.68rem', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)'
+                        fontSize: '0.68rem', fontWeight: 700, border: '1px solid var(--border-soft)'
                       }}>
                         {emp.userType === 'Both' ? 'Both Roles' :
                          emp.userType === 'ProductManager' ? 'Product Manager' : 'Employee'}
@@ -380,7 +380,7 @@ export default function EmployeeManagement() {
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 marginTop: '8px', padding: '4px 12px', borderRadius: '999px',
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                background: '#F1F5F9', border: '1px solid var(--border-soft)',
                 fontSize: '0.78rem', color: 'var(--text-muted)'
               }}>
                 <Mail size={12} /> Current: {resetPasswordUser.email}

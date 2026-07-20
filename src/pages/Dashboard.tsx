@@ -148,7 +148,7 @@ export default function Dashboard() {
       icon: <Briefcase size={24} />,
       color: 'var(--primary)',
       glow: 'var(--primary-glow)',
-      bg: 'rgba(14,165,233,0.15)',
+      bg: 'rgba(139,122,208,0.15)',
       accent: 'hsla(243,75%,65%,0.12)',
     },
     {
@@ -215,7 +215,7 @@ export default function Dashboard() {
         {kpiCards.map((card, i) => (
           <div
             key={card.label}
-            className="glass-panel stat-card"
+            className="glass-panel stat-card custom-card-highlight"
             style={{
               '--card-accent': card.accent,
               animationDelay: `${i * 0.08}s`
@@ -530,11 +530,11 @@ export default function Dashboard() {
         {/* Filter bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bug size={20} color="#f43f5e" />
+            <Bug size={20} color="var(--danger)" />
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
               All Bugs Queue
             </h3>
-            <span style={{ background: 'rgba(244,63,94,0.15)', color: '#f43f5e', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
+            <span style={{ background: 'var(--danger-glow)', color: 'var(--danger)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
               {pmBugsTotalCount}
             </span>
           </div>
@@ -622,11 +622,7 @@ export default function Dashboard() {
                       <td style={{ fontSize: '0.85rem' }}>{bug.raisedBy || '-'}</td>
                       <td style={{ fontSize: '0.85rem' }}>{bug.assignedTo || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>}</td>
                       <td>
-                        <span style={{
-                          background: sc.bg, color: sc.color,
-                          borderRadius: '999px', padding: '3px 10px',
-                          fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap'
-                        }}>
+                        <span className="badge" style={{ background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
                           {bug.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </td>

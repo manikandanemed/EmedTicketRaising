@@ -81,13 +81,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Top Navbar */}
       <header className="top-navbar" style={{
         height: '60px',
-        background: '#8B7AD0',
+        background: 'linear-gradient(135deg, #8B7AD0 0%, #7665BD 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
         color: '#fff',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        boxShadow: '0 2px 12px rgba(118, 101, 189, 0.25)',
         zIndex: 101,
         position: 'fixed',
         top: 0, left: 0, right: 0
@@ -113,14 +113,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <div style={{
               width: '28px', height: '28px',
               borderRadius: '50%',
-              background: '#FBBF24',
+              background: 'linear-gradient(135deg, #FDE68A 0%, #FBBF24 100%)',
               color: '#1E293B',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 800,
               fontSize: '0.85rem',
-              flexShrink: 0
+              flexShrink: 0,
+              boxShadow: '0 0 0 2px rgba(255,255,255,0.3)'
             }}>
               {initials[0]}
             </div>
@@ -170,10 +171,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             ) : (
               <span style={{
                 fontSize: '0.72rem',
-                background: 'rgba(255,255,255,0.2)',
-                padding: '2px 8px',
+                background: 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                padding: '2px 9px',
                 borderRadius: '10px',
-                fontWeight: 500
+                fontWeight: 600,
+                letterSpacing: '0.2px'
               }}>
                 {isPM ? 'Product Manager' : 'Employee'}
               </span>

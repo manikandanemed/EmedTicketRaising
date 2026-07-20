@@ -1715,9 +1715,9 @@ export default function Projects() {
                       className="form-select"
                       value={workItemAssigneeFilter}
                       onChange={(e) => setWorkItemAssigneeFilter(e.target.value)}
-                      style={{ 
+                      style={{
                         width: '180px',
-                        background: 'rgba(255,255,255,0.05)',
+                        background: '#F8FAFC',
                         border: '1px solid var(--border-soft)',
                         color: 'var(--text-primary)',
                         height: '38px',
@@ -1748,7 +1748,7 @@ export default function Projects() {
                       textOverflow: 'ellipsis',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
-                      background: 'rgba(255,255,255,0.05)',
+                      background: '#F8FAFC',
                       border: '1px solid var(--border-soft)',
                       color: 'var(--text-primary)',
                       height: '38px',
@@ -1870,7 +1870,7 @@ export default function Projects() {
                     onChange={(e) => setWorkItemDateFilter(e.target.value)}
                     style={{
                       width: '150px',
-                      background: 'rgba(255,255,255,0.05)',
+                      background: '#F8FAFC',
                       border: '1px solid var(--border-soft)',
                       color: 'var(--text-primary)',
                       height: '38px',
@@ -1959,7 +1959,7 @@ export default function Projects() {
                             {col.title}
                           </h4>
                           <span style={{
-                            background: 'rgba(255,255,255,0.05)',
+                            background: '#F1F5F9',
                             padding: '2px 8px',
                             borderRadius: '10px',
                             fontSize: '0.75rem',
@@ -1978,7 +1978,7 @@ export default function Projects() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              border: '1px dashed rgba(255,255,255,0.03)',
+                              border: '1px dashed var(--border-medium)',
                               borderRadius: '8px',
                               padding: '20px',
                               color: 'var(--text-muted)',
@@ -2447,12 +2447,12 @@ export default function Projects() {
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
         <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ maxWidth: '680px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
+          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
             <button className="modal-close" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
               <X size={24} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.6rem' }} className="gradient-text">Create Work Item</h2>
+            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.3rem' }} className="gradient-text">Create Work Item</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
             <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2929,7 +2929,7 @@ export default function Projects() {
                     borderRadius: 'var(--radius-md)',
                     padding: '24px',
                     textAlign: 'center',
-                    background: 'rgba(255, 255, 255, 0.01)',
+                    background: '#F8FAFC',
                     position: 'relative',
                     cursor: 'pointer',
                     transition: 'border-color 0.2s, background-color 0.2s'
@@ -2973,8 +2973,8 @@ export default function Projects() {
                         style={{
                           display: 'inline-block',
                           padding: '4px 10px',
-                          background: 'rgba(255,255,255,0.08)',
-                          border: '1px solid var(--border-soft)',
+                          background: 'var(--primary)',
+                          border: '1px solid var(--primary)',
                           borderRadius: '4px',
                           color: '#fff',
                           fontWeight: 600,
@@ -3003,7 +3003,7 @@ export default function Projects() {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px',
-                              background: 'rgba(255, 255, 255, 0.04)',
+                              background: '#F8FAFC',
                               border: '1px solid var(--border-soft)',
                               borderRadius: '4px',
                               padding: '6px 10px',
@@ -3263,7 +3263,7 @@ export default function Projects() {
             {/* TAB CONTENT: CLIENTS */}
             {hierarchyTab === 'clients' && (
               <div>
-                <form onSubmit={handleCreateClient} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
+                <form onSubmit={handleCreateClient} style={{ background: '#F8FAFC', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Client</h4>
                   <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -3400,7 +3400,7 @@ export default function Projects() {
             {/* TAB CONTENT: MODULES */}
             {hierarchyTab === 'modules' && (
               <div>
-                <form onSubmit={handleCreateModule} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
+                <form onSubmit={handleCreateModule} style={{ background: '#F8FAFC', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Module</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -3574,7 +3574,7 @@ export default function Projects() {
             {/* TAB CONTENT: BUILDS */}
             {hierarchyTab === 'builds' && (
               <div>
-                <form onSubmit={handleCreateBuild} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
+                <form onSubmit={handleCreateBuild} style={{ background: '#F8FAFC', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-soft)', marginBottom: '24px' }}>
                   <h4 style={{ marginBottom: '16px', fontWeight: 700 }}>Add Software Build</h4>
                   <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>

@@ -168,7 +168,7 @@ export default function MyNotes() {
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 required
-                style={{ background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-normal)' }}
+                style={{ background: 'var(--bg-input)', color: 'var(--text-primary)' }}
               >
                 <option value="low" style={{ background: 'var(--bg-app)' }}>Low 🟢</option>
                 <option value="medium" style={{ background: 'var(--bg-app)' }}>Medium 🔵</option>
@@ -184,7 +184,7 @@ export default function MyNotes() {
                 className="form-input"
                 value={assignedToUserId}
                 onChange={(e) => setAssignedToUserId(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ background: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-normal)' }}
+                style={{ background: 'var(--bg-input)', color: 'var(--text-primary)' }}
               >
                 <option value="" style={{ background: 'var(--bg-app)' }}>-- Keep Personal (No Assignment) --</option>
                 {employees.map(emp => (
@@ -277,7 +277,7 @@ export default function MyNotes() {
                 gap: '12px',
                 padding: '40px 0'
               }}>
-                <FileText size={40} style={{ color: 'rgba(255, 255, 255, 0.05)' }} />
+                <FileText size={40} style={{ color: 'var(--text-disabled)' }} />
                 <p style={{ margin: 0, fontSize: '0.95rem', textAlign: 'center' }}>
                   {filterDate ? `No notes found for ${new Date(filterDate).toLocaleDateString()}` : 'No notes logged yet. Write your first note on the left!'}
                 </p>
@@ -289,9 +289,9 @@ export default function MyNotes() {
                     key={note.id} 
                     className="glass-panel" 
                     style={{ 
-                      padding: '20px', 
-                      background: 'rgba(255, 255, 255, 0.02)', 
-                      border: '1px solid rgba(255, 255, 255, 0.04)',
+                      padding: '20px',
+                      background: 'var(--bg-app)',
+                      border: '1px solid var(--border-soft)',
                       position: 'relative'
                     }}
                   >
@@ -332,7 +332,7 @@ export default function MyNotes() {
                               borderRadius: '4px',
                               transition: 'color 0.2s, background-color 0.2s'
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'rgba(50, 150, 250, 0.1)'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.backgroundColor = 'var(--primary-glow)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                             title="Edit Note"
                           >
@@ -350,7 +350,7 @@ export default function MyNotes() {
                               borderRadius: '4px',
                               transition: 'color 0.2s, background-color 0.2s'
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.backgroundColor = 'var(--danger-glow)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                             title="Delete Note"
                           >
@@ -361,10 +361,10 @@ export default function MyNotes() {
                     </div>
 
                     {/* Content */}
-                    <p style={{ 
-                      margin: 0, 
-                      color: 'var(--text-normal)', 
-                      fontSize: '0.92rem', 
+                    <p style={{
+                      margin: 0,
+                      color: 'var(--text-primary)',
+                      fontSize: '0.92rem',
                       lineHeight: 1.6, 
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word'

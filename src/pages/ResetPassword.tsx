@@ -259,8 +259,8 @@ export default function ResetPassword() {
                   height: '130px',
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: '3px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                  border: '3px solid var(--border-soft)',
+                  boxShadow: '0 8px 24px rgba(30, 41, 59, 0.12)'
                 }}
               />
             ) : (
@@ -270,7 +270,7 @@ export default function ResetPassword() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '3rem', fontWeight: 800, color: 'white',
                 border: '3px solid rgba(14,165,233,0.4)',
-                boxShadow: '0 0 30px var(--primary-glow), 0 8px 24px rgba(0,0,0,0.3)'
+                boxShadow: '0 0 30px var(--primary-glow), 0 8px 24px rgba(30, 41, 59, 0.12)'
               }}>
                 {user.name.charAt(0).toUpperCase()}
               </div>
@@ -354,7 +354,7 @@ export default function ResetPassword() {
                 <CheckCircle size={24} />
                 <span>Password Changed Successfully!</span>
               </div>
-              <p style={{ color: 'var(--text-normal)', margin: '0 0 10px 0' }}>
+              <p style={{ color: 'var(--text-secondary)', margin: '0 0 10px 0' }}>
                 For security reasons, you will be logged out.
               </p>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
@@ -545,11 +545,11 @@ export default function ResetPassword() {
           <div 
             className="modal-content glass-panel" 
             style={{ 
-              maxWidth: '450px', 
-              padding: '24px', 
+              maxWidth: '450px',
+              padding: '24px',
               borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              background: 'rgba(20, 20, 25, 0.92)'
+              border: '1px solid var(--border-soft)',
+              background: '#FFFFFF'
             }}
           >
             <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
@@ -557,19 +557,19 @@ export default function ResetPassword() {
                 width: '40px',
                 height: '40px',
                 borderRadius: '50%',
-                background: customConfirm.isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(139, 92, 246, 0.1)',
+                background: customConfirm.isDanger ? 'var(--danger-glow)' : 'var(--primary-glow)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0
               }}>
-                <AlertCircle size={22} style={{ color: customConfirm.isDanger ? '#ef4444' : '#8b5cf6' }} />
+                <AlertCircle size={22} style={{ color: customConfirm.isDanger ? 'var(--danger)' : 'var(--primary)' }} />
               </div>
               <div>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {customConfirm.title}
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.92rem', color: '#a1a1aa', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   {customConfirm.message}
                 </p>
               </div>
