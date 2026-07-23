@@ -221,10 +221,10 @@ export default function BugDetails() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '24px', alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }}>
 
         {/* LEFT: Parent Task + Screenshot + Comments */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: '3 1 400px', minWidth: 0 }}>
 
           {/* Parent Task Context */}
           {workItem && (
@@ -339,7 +339,7 @@ export default function BugDetails() {
                     padding: '14px',
                     borderLeft: '3px solid var(--primary)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
                       <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{c.postedBy}</span>
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{new Date(c.createdAt).toLocaleString()}</span>
                     </div>
@@ -352,7 +352,7 @@ export default function BugDetails() {
         </div>
 
         {/* RIGHT SIDEBAR: Status + Meta */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: '1 1 260px', minWidth: 0 }}>
 
           {/* Status Update Card */}
           <div className="glass-panel" style={{ padding: '24px' }}>
@@ -402,44 +402,44 @@ export default function BugDetails() {
           <div className="glass-panel" style={{ padding: '24px' }}>
             <div style={{ fontWeight: 700, marginBottom: '16px' }}>Bug Info</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                 <User size={14} color="var(--text-muted)" />
                 <span style={{ color: 'var(--text-muted)' }}>Raised by:</span>
                 <span style={{ fontWeight: 600 }}>{bug.raisedBy}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                 <User size={14} color="var(--primary)" />
                 <span style={{ color: 'var(--text-muted)' }}>Assigned to:</span>
                 <span style={{ fontWeight: 600 }}>{bug.assignedTo || 'You'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                 <Calendar size={14} color="var(--text-muted)" />
                 <span style={{ color: 'var(--text-muted)' }}>Reported:</span>
                 <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
               </div>
               {bug.raisedBuild && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                   <CheckCircle2 size={14} color="var(--primary)" />
                   <span style={{ color: 'var(--text-muted)' }}>Raised Build:</span>
                   <span style={{ fontWeight: 600 }}>{bug.raisedBuild}</span>
                 </div>
               )}
               {bug.fixedBuild && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                   <CheckCircle2 size={14} color="#22c55e" />
                   <span style={{ color: 'var(--text-muted)' }}>Fixed Build:</span>
                   <span style={{ color: '#22c55e', fontWeight: 600 }}>{bug.fixedBuild}</span>
                 </div>
               )}
               {bug.fixedAt && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                   <CheckCircle2 size={14} color="#22c55e" />
                   <span style={{ color: 'var(--text-muted)' }}>Fixed Date:</span>
                   <span style={{ color: '#22c55e', fontWeight: 600 }}>{new Date(bug.fixedAt).toLocaleDateString()}</span>
                 </div>
               )}
               {bug.closedAt && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                   <CheckCircle2 size={14} color="#6b7280" />
                   <span style={{ color: 'var(--text-muted)' }}>Closed:</span>
                   <span style={{ color: '#6b7280' }}>{new Date(bug.closedAt).toLocaleDateString()}</span>
@@ -494,7 +494,7 @@ export default function BugDetails() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
                 <button
                   className="btn btn-primary"

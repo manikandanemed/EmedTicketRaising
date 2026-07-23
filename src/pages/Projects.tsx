@@ -1517,8 +1517,8 @@ export default function Projects() {
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                  <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0 }}>{selectedProject.name}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, wordBreak: 'break-word' }}>{selectedProject.name}</h1>
                   {isPM && (
                     <button 
                       onClick={handleOpenEditProject}
@@ -1598,7 +1598,7 @@ export default function Projects() {
               <h2>Work Items</h2>
               <p style={{ color: 'var(--text-muted)' }}>Tasks and issues tracked under this project.</p>
             </div>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               {workItemsTotalCount > 0 && (
                 <div className="glass-panel" style={{ display: 'flex', padding: '4px', gap: '4px', borderRadius: 'var(--radius-sm)', background: '#F1F5F9' }}>
                   <button 
@@ -2278,7 +2278,7 @@ export default function Projects() {
                 {isPM ? 'Create and manage client and product development portfolios.' : 'Browse all active projects and click to view tasks.'}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {isPM && (
                 <>
                   <button className="btn btn-secondary" onClick={handleExportAllCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3236,7 +3236,7 @@ export default function Projects() {
             </p>
 
             {/* Tab navigation */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)', marginBottom: '24px', gap: '16px' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-soft)', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
               {(['clients', 'modules', 'builds'] as const).map(tab => (
                 <button
                   key={tab}

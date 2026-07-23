@@ -690,7 +690,7 @@ export default function EmployeeDashboard() {
             Create
           </button>
           {/* Export one specific assigned project */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
             <select
               className="form-select"
               value={exportProjectId}
@@ -1352,7 +1352,7 @@ export default function EmployeeDashboard() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
                 <button
                   className="btn btn-primary"
@@ -2183,7 +2183,7 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditTask(false)} disabled={savingEditTask}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={savingEditTask} style={{ minWidth: '100px' }}>
                   {savingEditTask ? 'Saving...' : 'Save Changes'}

@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  CheckSquare, 
-  Bug, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Briefcase,
+  CheckSquare,
+  Bug,
+  LogOut,
   User,
   Layers,
   Users,
@@ -13,7 +13,8 @@ import {
   CheckCircle,
   AlertCircle,
   Info,
-  X
+  X,
+  Menu
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
 import { UserSession, API_BASE_URL, api } from './services/api';
@@ -50,6 +51,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   if (!user) return null;
 
@@ -93,7 +99,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         top: 0, left: 0, right: 0
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <button
+            className="mobile-nav-toggle"
+            onClick={() => setMobileNavOpen(prev => !prev)}
+            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          >
+            {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
           <span style={{ fontWeight: 800, fontSize: '1.4rem', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center' }}>
             <span style={{ color: '#FBBF24' }}>e</span>
             <span className="navbar-brand-full" style={{ color: '#fff' }}>Med Ticketing System</span>
@@ -216,8 +229,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Main Layout Area */}
       <div style={{ display: 'flex', flex: 1 }}>
+        {/* Backdrop for mobile drawer */}
+        {mobileNavOpen && (
+          <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />
+        )}
+
         {/* Sidebar */}
-        <aside className="sidebar">
+        <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>
           {/* Navigation */}
           <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <ul className="nav-links">
@@ -228,6 +246,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <Link
                       to={item.to}
                       className={`nav-link ${isActive ? 'active' : ''}`}
+                      onClick={() => setMobileNavOpen(false)}
                     >
                       <span className="nav-icon">{item.icon}</span>
                       <span>{item.label}</span>
@@ -284,9 +303,9 @@ const ToastContainer: React.FC = () => {
   return (
     <div style={{
       position: 'fixed',
-      top: '24px', right: '24px',
+      top: '24px', right: '24px', left: '24px',
       zIndex: 100000,
-      display: 'flex', flexDirection: 'column', gap: '10px',
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px',
       pointerEvents: 'none'
     }}>
       {toasts.map(t => {
@@ -308,7 +327,8 @@ const ToastContainer: React.FC = () => {
               boxShadow: `0 4px 12px rgba(0,0,0,0.05)`,
               borderRadius: 'var(--radius-md)',
               padding: '12px 16px',
-              minWidth: '300px',
+              width: '100%',
+              minWidth: '260px',
               maxWidth: '400px',
               display: 'flex',
               alignItems: 'center',

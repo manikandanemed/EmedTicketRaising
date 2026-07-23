@@ -240,9 +240,9 @@ export default function ResetPassword() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '30px', alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', alignItems: 'flex-start' }}>
         {/* Left Column: Profile Picture Upload */}
-        <div className="glass-panel" style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+        <div className="glass-panel" style={{ padding: 'clamp(20px, 6vw, 40px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flex: '1.1 1 300px', minWidth: 0 }}>
           <h3 style={{ margin: '0 0 24px 0', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Camera size={20} className="gradient-text" />
             <span>Profile Picture</span>
@@ -340,17 +340,17 @@ export default function ResetPassword() {
         </div>
 
         {/* Right Column: Email + Password */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: '1.9 1 340px', minWidth: 0 }}>
 
           {/* Change Password Panel */}
-          <div className="glass-panel" style={{ padding: '32px' }}>
+          <div className="glass-panel" style={{ padding: 'clamp(20px, 5vw, 32px)' }}>
             <h3 style={{ margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <KeyRound size={20} className="gradient-text" />
               <span>Change Password</span>
             </h3>
           {success ? (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px', fontWeight: 600, fontSize: '1.2rem' }}>
+              <div style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px', fontWeight: 600, fontSize: '1.2rem', flexWrap: 'wrap', textAlign: 'center' }}>
                 <CheckCircle size={24} />
                 <span>Password Changed Successfully!</span>
               </div>
@@ -514,10 +514,10 @@ export default function ResetPassword() {
               <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>➕</span>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
                 onClick={() => setCropImageSrc(null)}
                 disabled={uploading}
                 style={{ padding: '8px 16px' }}
@@ -565,7 +565,7 @@ export default function ResetPassword() {
               }}>
                 <AlertCircle size={22} style={{ color: customConfirm.isDanger ? 'var(--danger)' : 'var(--primary)' }} />
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {customConfirm.title}
                 </h3>
@@ -574,7 +574,7 @@ export default function ResetPassword() {
                 </p>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
               <button 
                 className="btn btn-secondary" 
                 onClick={() => setCustomConfirm(null)}

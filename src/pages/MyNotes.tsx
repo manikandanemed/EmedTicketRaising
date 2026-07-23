@@ -135,9 +135,9 @@ export default function MyNotes() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '30px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '30px', alignItems: 'start' }}>
         {/* Left Column: Add Note Form */}
-        <div className="glass-panel" style={{ padding: '30px' }}>
+        <div className="glass-panel" style={{ padding: '30px', minWidth: 0 }}>
           <h3 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <PlusCircle size={20} className="gradient-text" />
             <span>{editingNoteId !== null ? 'Edit Note' : 'Add New Note'}</span>
@@ -222,7 +222,7 @@ export default function MyNotes() {
         </div>
 
         {/* Right Column: Filter & Notes List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
           {/* Filter Bar */}
           <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -230,13 +230,13 @@ export default function MyNotes() {
               <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Filter by Date</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
               <input
                 type="date"
                 className="form-input"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                style={{ width: '180px', padding: '6px 12px' }}
+                style={{ width: '100%', maxWidth: '180px', minWidth: 0, padding: '6px 12px' }}
               />
               {filterDate && (
                 <button 
@@ -296,8 +296,8 @@ export default function MyNotes() {
                     }}
                   >
                     {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
                         <span className="badge badge-testing" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
                           <Calendar size={12} />
                           {new Date(note.noteDate).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}

@@ -240,7 +240,7 @@ export default function Dashboard() {
       <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
         {/* Work Items */}
         <div className="glass-panel" style={{ padding: '28px' }}>
-          <div className="section-header" style={{ marginBottom: '22px' }}>
+          <div className="section-header" style={{ marginBottom: '22px', flexWrap: 'wrap', gap: '8px' }}>
             <div className="section-title">
               <CheckSquare size={18} color="var(--primary-hover)" />
               Work Item Status Breakdown
@@ -274,7 +274,7 @@ export default function Dashboard() {
 
         {/* Bug Statuses */}
         <div className="glass-panel" style={{ padding: '28px' }}>
-          <div className="section-header" style={{ marginBottom: '22px' }}>
+          <div className="section-header" style={{ marginBottom: '22px', flexWrap: 'wrap', gap: '8px' }}>
             <div className="section-title">
               <Bug size={18} color="var(--danger)" />
               Bug Status Breakdown
@@ -309,7 +309,7 @@ export default function Dashboard() {
 
       {/* Employee Workload Table */}
       <div className="glass-panel" style={{ padding: '28px' }}>
-        <div className="section-header" style={{ marginBottom: '20px' }}>
+        <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <Activity size={18} color="var(--secondary)" />
             Employee Workloads &amp; Task Distribution
@@ -412,7 +412,7 @@ export default function Dashboard() {
                             <div style={{
                               margin: '0 16px 16px',
                               display: 'grid',
-                              gridTemplateColumns: '1.2fr 1fr',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                               gap: '16px',
                               background: 'rgba(14,165,233,0.04)',
                               borderRadius: 'var(--radius-md)',
@@ -502,7 +502,7 @@ export default function Dashboard() {
                                   ) : (
                                     emp.noteHistory.map(note => (
                                       <div key={note.id} style={{ borderLeft: '2px solid var(--primary)', paddingLeft: '10px', marginLeft: '4px', fontSize: '0.8rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '4px', marginBottom: '3px' }}>
                                           <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{note.createdByName}</span>
                                           <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{new Date(note.createdAt).toLocaleDateString()}</span>
                                         </div>

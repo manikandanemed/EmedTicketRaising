@@ -381,7 +381,8 @@ export default function EmployeeManagement() {
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 marginTop: '8px', padding: '4px 12px', borderRadius: '999px',
                 background: '#F1F5F9', border: '1px solid var(--border-soft)',
-                fontSize: '0.78rem', color: 'var(--text-muted)'
+                fontSize: '0.78rem', color: 'var(--text-muted)',
+                maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}>
                 <Mail size={12} /> Current: {resetPasswordUser.email}
               </div>
@@ -396,7 +397,7 @@ export default function EmployeeManagement() {
                 <Mail size={14} color="var(--primary)" />
                 <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--primary)' }}>Update Email</span>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 <input
                   id="adminNewEmail"
                   type="email"
@@ -404,7 +405,7 @@ export default function EmployeeManagement() {
                   placeholder="Enter new email address"
                   value={adminNewEmail}
                   onChange={e => setAdminNewEmail(e.target.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 200px', minWidth: 0 }}
                 />
                 <button
                   className="btn btn-primary"
@@ -427,7 +428,7 @@ export default function EmployeeManagement() {
                 <KeyRound size={14} color="var(--accent)" />
                 <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--accent)' }}>Reset Password</span>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 <input
                   id="adminNewPassword"
                   type="password"
@@ -435,7 +436,7 @@ export default function EmployeeManagement() {
                   placeholder="Min. 6 characters"
                   value={adminNewPassword}
                   onChange={e => setAdminNewPassword(e.target.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 200px', minWidth: 0 }}
                 />
                 <button
                   className="btn btn-primary"

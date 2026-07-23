@@ -550,7 +550,7 @@ export default function WorkItemDetails() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px' }}>
           
           {/* Main Info */}
-          <div style={{ flex: 1, minWidth: '300px' }}>
+          <div style={{ flex: 1, minWidth: 'min(300px, 100%)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <span className="badge badge-testing" style={{ fontSize: '0.8rem' }}>{workItem.workNumber}</span>
               <span className={`badge badge-${workItem.priority}`}>{workItem.priority}</span>
@@ -622,7 +622,9 @@ export default function WorkItemDetails() {
 
           {/* Action Pane */}
           <div style={{
-            width: '280px',
+            flex: '1 1 260px',
+            maxWidth: '280px',
+            width: '100%',
             background: 'var(--bg-app)',
             padding: '24px',
             borderRadius: 'var(--radius-md)',
@@ -818,7 +820,7 @@ export default function WorkItemDetails() {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 {/* PM Internal Comments Toggle */}
                 {isPM ? (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -899,7 +901,7 @@ export default function WorkItemDetails() {
                 <div key={bug.id} className="glass-panel" style={{ padding: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                         <span className="badge badge-bug_found" style={{ fontWeight: 700 }}>{bug.bugNumber}</span>
                         <span className={`badge badge-${bug.status}`}>{bug.status}</span>
                       </div>
@@ -969,7 +971,7 @@ export default function WorkItemDetails() {
                     flexWrap: 'wrap'
                   }}>
                     {/* Reassign Bug */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Assigned to:</label>
                       {isPM ? (
                         <select
@@ -989,7 +991,7 @@ export default function WorkItemDetails() {
                     </div>
 
                     {/* Change Bug Status (Only available to Employee / PM) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status:</label>
                       <select
                         className="form-select"
@@ -1071,7 +1073,7 @@ export default function WorkItemDetails() {
                           <span style={{ fontWeight: 700, color: meta.color, fontSize: '0.85rem' }}>{meta.label}</span>
                           <span style={{ color: 'var(--text-primary)', fontSize: '0.88rem' }}>{description}</span>
                         </div>
-                        <div style={{ marginTop: '4px', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                        <div style={{ marginTop: '4px', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <span>By <strong style={{ color: 'var(--text-secondary)' }}>{log.byUser}</strong></span>
                           <span>•</span>
                           <span>{timeStr}</span>
@@ -1109,7 +1111,7 @@ export default function WorkItemDetails() {
                       ))}
                     </select>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button className="btn btn-secondary" onClick={() => setShowReassignModal(false)}>Cancel</button>
                     <button
                       className="btn btn-primary"
@@ -1301,7 +1303,7 @@ export default function WorkItemDetails() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowRaiseBug(false); setBugTitleError(''); }}>
                   Cancel
                 </button>
@@ -1348,7 +1350,7 @@ export default function WorkItemDetails() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn btn-secondary" onClick={handleCancelFixedBuild}>Cancel</button>
                 <button
                   className="btn btn-primary"
@@ -1398,9 +1400,9 @@ export default function WorkItemDetails() {
                 </p>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button 
-                className="btn btn-secondary" 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary"
                 onClick={() => setCustomConfirm(null)}
                 style={{ padding: '8px 16px', fontSize: '0.85rem' }}
               >
