@@ -13,14 +13,12 @@ export default defineConfig(({ command }) => ({
   server: {
     proxy: {
       '/ticket-system/api': {
-        target: 'http://localhost:5298',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ticket-system/, ''),
+        target: 'https://icdextract.emedlogix.com',
+        changeOrigin: true
       },
       '/ticket-system/uploads': {
-        target: 'http://localhost:5298',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ticket-system/, ''),
+        target: 'https://icdextract.emedlogix.com',
+        changeOrigin: true
       }
     }
   }

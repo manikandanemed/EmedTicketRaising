@@ -2450,15 +2450,15 @@ export default function Projects() {
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
         <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
-            <button className="modal-close" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
-              <X size={24} />
+          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px', background: '#FFFFFF', borderRadius: '12px' }}>
+            <button type="button" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }} style={{ background: '#F8FAFC', border: '1px solid var(--border-medium)', borderRadius: '4px', padding: '4px', cursor: 'pointer', display: 'inline-flex', marginBottom: '12px' }}>
+              <X size={14} style={{ color: 'var(--text-secondary)' }} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.3rem' }} className="gradient-text">Create Work Item</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
+            <h2 style={{ margin: '0 0 4px 0', fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)' }}>Create Work Item</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0 0 24px 0' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
-            <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form className="jira-form" onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Client Selection */}
               <div className="form-group">
                 <label htmlFor="funcClient">Client</label>
@@ -2723,15 +2723,22 @@ export default function Projects() {
               {/* Description */}
               <div className="form-group">
                 <label htmlFor="funcDesc">Description</label>
-                <textarea
-                  id="funcDesc"
-                  className="form-textarea"
-                  rows={4}
-                  placeholder="Press Ctrl + / to learn time-saving keyboard shortcuts."
-                  value={newWorkDesc}
-                  onChange={(e) => setNewWorkDesc(e.target.value)}
-                  style={{ fontSize: '0.92rem' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    id="funcDesc"
+                    className="form-input"
+                    rows={4}
+                    placeholder="Press Ctrl + / to learn time-saving keyboard shortcuts."
+                    value={newWorkDesc}
+                    onChange={(e) => setNewWorkDesc(e.target.value)}
+                    style={{ fontSize: '0.92rem', resize: 'vertical' }}
+                  />
+                  <div style={{ position: 'absolute', bottom: '6px', right: '6px', pointerEvents: 'none' }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M10 2L2 10M10 6L6 10" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               {/* Assignee Selection */}
@@ -2928,11 +2935,11 @@ export default function Projects() {
                 <label>Attachment</label>
                 <div 
                   style={{
-                    border: '2px dashed var(--border-medium)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '24px',
+                    border: '1.5px dashed var(--border-medium)',
+                    borderRadius: '8px',
+                    padding: '30px 20px',
                     textAlign: 'center',
-                    background: '#F8FAFC',
+                    background: '#FAFCFD',
                     position: 'relative',
                     cursor: 'pointer',
                     transition: 'border-color 0.2s, background-color 0.2s'
@@ -2968,25 +2975,27 @@ export default function Projects() {
                     id="jiraFileInput"
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.8rem', color: 'var(--text-muted)' }}>☁️</span>
-                    <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '1.5rem', color: '#A5B4FC' }}>☁️</span>
+                    <span style={{ fontSize: '0.85rem', color: '#475569' }}>
                       Drop files to attach or{' '}
                       <label 
                         htmlFor="jiraFileInput" 
                         style={{
                           display: 'inline-block',
-                          padding: '4px 10px',
-                          background: 'var(--primary)',
-                          border: '1px solid var(--primary)',
+                          padding: '6px 14px',
+                          background: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
                           borderRadius: '4px',
-                          color: '#fff',
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
+                          color: '#334155',
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
                           cursor: 'pointer',
-                          marginLeft: '6px'
+                          marginLeft: '6px',
+                          textTransform: 'uppercase',
+                          marginBottom: 0
                         }}
                       >
-                        Browse
+                        BROWSE
                       </label>
                     </span>
                   </div>
@@ -3044,16 +3053,16 @@ export default function Projects() {
               </div>
 
               {/* Action Buttons Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '16px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" style={{ background: '#FFFFFF', border: '1px solid var(--border-medium)', padding: '8px 24px', fontWeight: 600, fontSize: '0.85rem' }} onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
                   Cancel
                 </button>
 
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button 
                     type="submit" 
                     className="btn btn-secondary" 
-                    style={{ borderColor: 'var(--border-medium)', color: 'var(--text-secondary)' }}
+                    style={{ background: '#FFFFFF', border: '1px solid var(--border-medium)', color: '#475569', padding: '8px 16px', fontWeight: 600, fontSize: '0.85rem' }}
                     onClick={() => setSubmissionType('copy')}
                     disabled={creatingWorkItem || uploadingFiles}
                   >
@@ -3062,7 +3071,7 @@ export default function Projects() {
                   <button 
                     type="submit" 
                     className="btn btn-secondary"
-                    style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    style={{ background: '#FFFFFF', border: '2px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', fontWeight: 700, fontSize: '0.85rem' }}
                     onClick={() => setSubmissionType('another')}
                     disabled={creatingWorkItem || uploadingFiles}
                   >
@@ -3071,6 +3080,7 @@ export default function Projects() {
                   <button 
                     type="submit" 
                     className="btn btn-primary" 
+                    style={{ padding: '8px 24px', fontWeight: 700, fontSize: '0.85rem', background: 'var(--primary)', color: '#FFFFFF', border: 'none' }}
                     onClick={() => setSubmissionType('standard')}
                     disabled={creatingWorkItem || uploadingFiles}
                   >

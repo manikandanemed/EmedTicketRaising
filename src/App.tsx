@@ -52,6 +52,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -63,17 +64,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const navItems = isPM
     ? [
-        { to: '/', icon: <LayoutDashboard size={18} />, label: 'Dashboard', match: (p: string) => p === '/' },
-        { to: '/projects', icon: <Briefcase size={18} />, label: 'Projects', match: (p: string) => p.startsWith('/projects') },
-        { to: '/employees', icon: <Users size={18} />, label: 'Employees', match: (p: string) => p.startsWith('/employees') },
-        { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
-        { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
-      ]
+      { to: '/', icon: <LayoutDashboard size={18} />, label: 'Dashboard', match: (p: string) => p === '/' },
+      { to: '/projects', icon: <Briefcase size={18} />, label: 'Projects', match: (p: string) => p.startsWith('/projects') },
+      { to: '/employees', icon: <Users size={18} />, label: 'Employees', match: (p: string) => p.startsWith('/employees') },
+      { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
+      { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
+    ]
     : [
-        { to: '/', icon: <CheckSquare size={18} />, label: 'My Works', match: (p: string) => p === '/' },
-        { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
-        { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
-      ];
+      { to: '/', icon: <CheckSquare size={18} />, label: 'My Works', match: (p: string) => p === '/' },
+      { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
+      { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
+    ];
 
   const initials = user.name
     .split(' ')
@@ -83,27 +84,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     .slice(0, 2);
 
   return (
-    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Top Navbar */}
       <header className="top-navbar" style={{
         height: '60px',
-        background: 'linear-gradient(135deg, #8B7AD0 0%, #7665BD 100%)',
+        flexShrink: 0,
+        background: 'var(--primary-dark)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
         color: '#fff',
-        boxShadow: '0 2px 12px rgba(118, 101, 189, 0.25)',
+        boxShadow: '0 4px 16px rgba(100, 82, 166, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1)',
         zIndex: 101,
-        position: 'fixed',
-        top: 0, left: 0, right: 0
+        position: 'relative'
       }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
           <button
-            className="mobile-nav-toggle"
-            onClick={() => setMobileNavOpen(prev => !prev)}
-            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            className="nav-toggle"
+            onClick={() => {
+              if (window.innerWidth <= 992) {
+                setMobileNavOpen(prev => !prev);
+              } else {
+                setSidebarCollapsed(prev => !prev);
+              }
+            }}
+            aria-label="Toggle navigation menu"
           >
             {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -228,14 +236,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/* Main Layout Area */}
-      <div style={{ display: 'flex', flex: 1 }}>
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'calc(100% - 60px)' }}>
         {/* Backdrop for mobile drawer */}
         {mobileNavOpen && (
           <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} />
         )}
 
         {/* Sidebar */}
-        <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>
+        <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Navigation */}
           <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <ul className="nav-links">
@@ -249,7 +257,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       onClick={() => setMobileNavOpen(false)}
                     >
                       <span className="nav-icon">{item.icon}</span>
-                      <span>{item.label}</span>
+                      <span className="nav-label">{item.label}</span>
                     </Link>
                   </li>
                 );
@@ -296,8 +304,8 @@ const ToastContainer: React.FC = () => {
 
   const colorMap = {
     success: { border: '#A7F3D0', bg: '#ECFDF5', text: '#065F46', iconColor: '#10B981' },
-    error:   { border: '#FCA5A5', bg: '#FEF2F2', text: '#991B1B', iconColor: '#EF4444' },
-    info:    { border: '#C7D2FE', bg: '#EEF2FF', text: '#3730A3', iconColor: '#6366F1' },
+    error: { border: '#FCA5A5', bg: '#FEF2F2', text: '#991B1B', iconColor: '#EF4444' },
+    info: { border: '#C7D2FE', bg: '#EEF2FF', text: '#3730A3', iconColor: '#6366F1' },
   };
 
   return (
@@ -312,10 +320,10 @@ const ToastContainer: React.FC = () => {
         const colors = colorMap[t.type as keyof typeof colorMap] || colorMap.info;
         const iconMap = {
           success: <CheckCircle size={16} color={colors.iconColor} style={{ flexShrink: 0 }} />,
-          error:   <AlertCircle size={16} color={colors.iconColor}  style={{ flexShrink: 0 }} />,
-          info:    <Info        size={16} color={colors.iconColor}    style={{ flexShrink: 0 }} />,
+          error: <AlertCircle size={16} color={colors.iconColor} style={{ flexShrink: 0 }} />,
+          info: <Info size={16} color={colors.iconColor} style={{ flexShrink: 0 }} />,
         };
-        
+
         return (
           <div
             key={t.id}
@@ -378,7 +386,7 @@ export const AppContent: React.FC = () => {
     <>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          <Route path="/login"    element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           <Route path="/" element={
@@ -492,13 +500,13 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, login, logout, updateUser }}>
-       <BrowserRouter basename={import.meta.env.BASE_URL}>
-          {/* <Router> */}
-        
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        {/* <Router> */}
+
         <AppContent />
-      {/* </Router> */}
-       </BrowserRouter>
-   
+        {/* </Router> */}
+      </BrowserRouter>
+
     </AuthContext.Provider>
   );
 }

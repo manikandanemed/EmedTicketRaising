@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, PersonalNoteDto, EmployeeDropdownDto } from '../services/api';
 import { toast } from '../services/toast';
-import { FileText, Calendar, Trash2, PlusCircle, Filter, RotateCcw, AlertCircle, Edit2, User } from 'lucide-react';
+import { FileText, Calendar, Trash2, PlusCircle, Filter, RotateCcw, AlertCircle, Edit2, User, Send, Clipboard } from 'lucide-react';
 import { useAuth } from '../App';
 
 export default function MyNotes() {
@@ -128,10 +128,31 @@ export default function MyNotes() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1>My Notes & Diary</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Write and manage your daily personal notes, reminders, or standup updates.</p>
+      <div className="page-header" style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1 style={{ color: '#0F172A', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.2rem' }}>My Notes & Diary</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Write and manage your daily personal notes, reminders, or standup updates.</p>
+        </div>
+        
+        {/* Background Graphic SVG */}
+        <div style={{ position: 'absolute', right: 0, top: '-20px', pointerEvents: 'none', opacity: 0.9 }}>
+          <svg width="240" height="120" viewBox="0 0 240 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="130" y="25" width="70" height="90" rx="8" fill="#E0E7FF" transform="rotate(12 130 25)" />
+            <rect x="145" y="15" width="70" height="90" rx="8" fill="#F0EDFF" transform="rotate(-6 145 15)" />
+            <rect x="160" y="10" width="60" height="85" rx="6" fill="#FFFFFF" stroke="var(--primary)" strokeWidth="3" />
+            <line x1="170" y1="25" x2="210" y2="25" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+            <line x1="170" y1="40" x2="210" y2="40" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+            <line x1="170" y1="55" x2="210" y2="55" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+            <line x1="170" y1="70" x2="190" y2="70" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+            <path d="M220 35 L200 85 L195 90 L197 83 L225 37 Z" fill="var(--primary)" />
+            <circle cx="165" cy="10" r="4" fill="var(--primary)" />
+            <circle cx="185" cy="10" r="4" fill="var(--primary)" />
+            <circle cx="205" cy="10" r="4" fill="var(--primary)" />
+            <path d="M120 100 Q 130 90 140 105" stroke="#E0E7FF" strokeWidth="2" fill="none" strokeLinecap="round" />
+            <circle cx="110" cy="95" r="2" fill="#E0E7FF" />
+            <circle cx="100" cy="105" r="1.5" fill="#E0E7FF" />
+            <circle cx="190" cy="5" r="1" fill="#C7D2FE" />
+          </svg>
         </div>
       </div>
 
@@ -139,8 +160,8 @@ export default function MyNotes() {
         {/* Left Column: Add Note Form */}
         <div className="glass-panel" style={{ padding: '30px', minWidth: 0 }}>
           <h3 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <PlusCircle size={20} className="gradient-text" />
-            <span>{editingNoteId !== null ? 'Edit Note' : 'Add New Note'}</span>
+            <PlusCircle size={20} style={{ color: 'var(--primary)', fill: 'var(--primary)', stroke: '#fff' }} />
+            <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{editingNoteId !== null ? 'Edit Note' : 'Add New Note'}</span>
           </h3>
 
           <form onSubmit={handleSaveNote} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -208,15 +229,26 @@ export default function MyNotes() {
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving || !content.trim()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: '10px 24px', background: '#FFFFFF' }}
+                onClick={() => {
+                  if (editingNoteId !== null) {
+                    handleCancelEdit();
+                  } else {
+                    setContent(''); setNoteDate(new Date().toISOString().split('T')[0]); setPriority('medium'); setAssignedToUserId('');
+                  }
+                }}
+              >
+                {editingNoteId !== null ? 'Cancel' : 'Clear'}
+              </button>
+              
+              <button type="submit" className="btn btn-primary" style={{ padding: '10px 24px' }} disabled={saving || !content.trim()}>
+                <Send size={18} />
                 {saving ? 'Saving...' : editingNoteId !== null ? 'Update Note' : 'Save Note'}
               </button>
-              {editingNoteId !== null && (
-                <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>
-                  Cancel
-                </button>
-              )}
             </div>
           </form>
         </div>
@@ -224,29 +256,28 @@ export default function MyNotes() {
         {/* Right Column: Filter & Notes List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
           {/* Filter Bar */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Filter size={18} style={{ color: 'var(--primary)' }} />
-              <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>Filter by Date</span>
+              <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0F172A' }}>Filter by Date</span>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <input
                 type="date"
                 className="form-input"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                style={{ width: '100%', maxWidth: '180px', minWidth: 0, padding: '6px 12px' }}
+                style={{ width: '160px', padding: '8px 12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}
               />
               {filterDate && (
                 <button 
                   className="btn btn-secondary"
                   onClick={() => setFilterDate('')}
-                  style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
+                  style={{ padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   title="Clear Filter"
                 >
-                  <RotateCcw size={14} />
-                  <span>Clear</span>
+                  <RotateCcw size={16} />
                 </button>
               )}
             </div>
@@ -254,10 +285,15 @@ export default function MyNotes() {
 
           {/* Notes Log */}
           <div className="glass-panel" style={{ padding: '30px', minHeight: '350px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <FileText size={20} className="gradient-text" />
-              <span>Notes History</span>
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FileText size={20} style={{ color: '#0F172A' }} />
+                <span style={{ color: '#0F172A', fontWeight: 700 }}>Notes History</span>
+              </h3>
+              <span className="badge" style={{ background: '#F0EDFF', color: 'var(--primary)', padding: '6px 12px', borderRadius: '20px', fontWeight: 600, fontSize: '0.8rem' }}>
+                {notes.length} Notes
+              </span>
+            </div>
 
             {loading ? (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Loading notes...</p>
@@ -273,14 +309,25 @@ export default function MyNotes() {
                 flexDirection: 'column', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                color: 'var(--text-muted)',
-                gap: '12px',
-                padding: '40px 0'
+                border: '1.5px dashed var(--border-soft)',
+                borderRadius: '16px',
+                backgroundColor: '#FAFCFD',
+                padding: '60px 20px',
+                gap: '16px'
               }}>
-                <FileText size={40} style={{ color: 'var(--text-disabled)' }} />
-                <p style={{ margin: 0, fontSize: '0.95rem', textAlign: 'center' }}>
-                  {filterDate ? `No notes found for ${new Date(filterDate).toLocaleDateString()}` : 'No notes logged yet. Write your first note on the left!'}
-                </p>
+                <div style={{ position: 'relative' }}>
+                  <Clipboard size={64} style={{ color: '#C7D2FE' }} strokeWidth={1.5} />
+                  <div style={{ position: 'absolute', top: -10, right: -15, color: '#A5B4FC', fontSize: '1.2rem' }}>✦</div>
+                  <div style={{ position: 'absolute', bottom: 5, left: -15, color: '#A5B4FC', fontSize: '1.2rem' }}>●</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+                    {filterDate ? 'No notes found for this date' : 'No notes logged yet.'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+                    {filterDate ? 'Try clearing the filter or picking another day.' : 'Write your first note on the left!'}
+                  </p>
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

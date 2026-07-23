@@ -684,36 +684,36 @@ export default function EmployeeDashboard() {
           <h1>My Work Queue</h1>
           <p style={{ color: 'var(--text-muted)' }}>Your assigned tasks and bugs — all in one place.</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button className="btn btn-primary" onClick={() => { setShowCreateFunctional(true); setCreateAnother(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="page-header-actions" style={{ display: 'flex', gap: '12px', flexWrap: 'nowrap', alignItems: 'center' }}>
+          <button className="btn btn-primary" onClick={() => { setShowCreateFunctional(true); setCreateAnother(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 600 }}>
             <PlusCircle size={18} />
             Create
           </button>
-          {/* Export one specific assigned project */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <select
-              className="form-select"
-              value={exportProjectId}
-              onChange={(e) => setExportProjectId(e.target.value === '' ? '' : Number(e.target.value))}
-              style={{ padding: '8px 12px', fontSize: '0.85rem', minWidth: '160px' }}
-            >
-              <option value="">Select project…</option>
-              {projects.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
-              ))}
-            </select>
-            <button
-              className="btn btn-secondary"
-              onClick={handleExportSelectedProjectCSV}
-              disabled={!exportProjectId || exportingProject}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Download size={18} />
-              {exportingProject ? 'Exporting…' : 'Export Project'}
-            </button>
-          </div>
-
-          <button className="btn btn-secondary" onClick={fetchData}>
+          
+          <button
+            className="btn btn-secondary"
+            onClick={handleExportSelectedProjectCSV}
+            disabled={!exportProjectId || exportingProject}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontWeight: 600 }}
+          >
+            <Download size={18} />
+            {exportingProject ? 'Exporting…' : 'Export Project'}
+          </button>
+          
+          <select
+            className="form-select"
+            value={exportProjectId}
+            onChange={(e) => setExportProjectId(e.target.value === '' ? '' : Number(e.target.value))}
+            style={{ padding: '0 14px', fontSize: '0.9rem', height: '42px', minWidth: '180px', maxWidth: '240px', cursor: 'pointer' }}
+          >
+            <option value="">Select project…</option>
+            {projects.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name} ({p.projectNumber})</option>
+            ))}
+          </select>
+          
+          <button className="btn btn-secondary" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', fontWeight: 600 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
             Sync Work
           </button>
         </div>
@@ -721,43 +721,47 @@ export default function EmployeeDashboard() {
 
       {/* Quick Summary Cards */}
       <div className="dashboard-grid">
-        <div className="stat-card glass-panel custom-card-highlight">
+        <div className="stat-card glass-panel custom-card-highlight" style={{ borderBottom: '4px solid var(--primary)' }}>
           <div className="stat-info">
-            <h3>Pending Tasks</h3>
-            <p>{pendingTasks}</p>
+            <h3 style={{ color: 'var(--primary)' }}>Pending Tasks</h3>
+            <p style={{ color: '#0F172A' }}>{pendingTasks}</p>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Tasks waiting to start</span>
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(100, 116, 139, 0.15)', color: 'var(--text-muted)' }}>
-            <Clock size={24} />
+          <div className="stat-icon" style={{ background: 'var(--primary-glow)', color: 'var(--primary)' }}>
+            <Clock size={28} />
           </div>
         </div>
 
-        <div className="stat-card glass-panel custom-card-highlight">
+        <div className="stat-card glass-panel custom-card-highlight" style={{ borderBottom: '4px solid var(--warning)' }}>
           <div className="stat-info">
-            <h3>In Progress</h3>
-            <p style={{ color: 'var(--warning)' }}>{inProgressTasks}</p>
+            <h3 style={{ color: 'var(--warning)' }}>In Progress</h3>
+            <p style={{ color: '#0F172A' }}>{inProgressTasks}</p>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Tasks in progress</span>
           </div>
           <div className="stat-icon" style={{ background: 'var(--warning-glow)', color: 'var(--warning)' }}>
-            <Clock size={24} />
+            <Clock size={28} />
           </div>
         </div>
 
-        <div className="stat-card glass-panel custom-card-highlight">
+        <div className="stat-card glass-panel custom-card-highlight" style={{ borderBottom: '4px solid var(--danger)' }}>
           <div className="stat-info">
-            <h3>Bugs Assigned</h3>
-            <p style={{ color: 'var(--danger)' }}>{activeBugs}</p>
+            <h3 style={{ color: 'var(--danger)' }}>Bugs Assigned</h3>
+            <p style={{ color: '#0F172A' }}>{activeBugs}</p>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Bugs assigned to you</span>
           </div>
           <div className="stat-icon" style={{ background: 'var(--danger-glow)', color: 'var(--danger)' }}>
-            <Bug size={24} />
+            <Bug size={28} />
           </div>
         </div>
 
-        <div className="stat-card glass-panel custom-card-highlight">
+        <div className="stat-card glass-panel custom-card-highlight" style={{ borderBottom: '4px solid var(--success)' }}>
           <div className="stat-info">
-            <h3>Completed</h3>
-            <p style={{ color: 'var(--success)' }}>{completedTasks}</p>
+            <h3 style={{ color: 'var(--success)' }}>Completed</h3>
+            <p style={{ color: '#0F172A' }}>{completedTasks}</p>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>Tasks completed</span>
           </div>
           <div className="stat-icon" style={{ background: 'var(--success-glow)', color: 'var(--success)' }}>
-            <CheckSquare size={24} />
+            <CheckSquare size={28} />
           </div>
         </div>
       </div>
@@ -970,10 +974,19 @@ export default function EmployeeDashboard() {
 
       {/* UNIFIED QUEUE: JIRA-Style Tables */}
       {filteredTasks.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon"><CheckSquare size={28} /></div>
-          <h3>No work items found.</h3>
-          <p>No tasks or bugs assigned to you yet.</p>
+        <div className="empty-state glass-panel" style={{ padding: '80px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', position: 'relative' }}>
+          <div className="empty-state-icon" style={{ background: 'transparent', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', marginBottom: '8px' }}>
+            <div style={{ position: 'relative' }}>
+              <CheckSquare size={48} strokeWidth={1.5} />
+              <div style={{ position: 'absolute', top: '-10px', left: '-20px', width: '4px', height: '4px', background: 'var(--primary)', borderRadius: '50%' }} />
+              <div style={{ position: 'absolute', top: '10px', right: '-25px', width: '6px', height: '6px', border: '1px solid var(--primary)', borderRadius: '50%' }} />
+              <div style={{ position: 'absolute', bottom: '-15px', left: '10px', width: '3px', height: '3px', background: 'var(--primary)', borderRadius: '50%' }} />
+            </div>
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '10px' }}>No work items found</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>You're all caught up! New tasks and bugs will appear here.</p>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
@@ -1370,15 +1383,15 @@ export default function EmployeeDashboard() {
       {/* CREATE FUNCTIONAL REQUIREMENTS MODAL (JIRA STYLE) */}
       {showCreateFunctional && createPortal(
         <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px' }}>
-            <button className="modal-close" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
-              <X size={24} />
+          <div className="modal-content glass-panel" style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto', padding: '28px', background: '#FFFFFF', borderRadius: '12px' }}>
+            <button type="button" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }} style={{ background: '#F8FAFC', border: '1px solid var(--border-medium)', borderRadius: '4px', padding: '4px', cursor: 'pointer', display: 'inline-flex', marginBottom: '12px' }}>
+              <X size={14} style={{ color: 'var(--text-secondary)' }} />
             </button>
             
-            <h2 style={{ marginBottom: '6px', fontWeight: 800, fontSize: '1.3rem' }} className="gradient-text">Create Work Item</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '20px' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
+            <h2 style={{ margin: '0 0 4px 0', fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)' }}>Create Work Item</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0 0 24px 0' }}>Required fields are marked with an asterisk <span style={{ color: 'var(--danger)' }}>*</span></p>
 
-            <form onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form className="jira-form" onSubmit={handleCreateFunctionalRequirement} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Client Selection */}
               <div className="form-group">
                 <label htmlFor="funcClient">Client</label>
@@ -1643,15 +1656,22 @@ export default function EmployeeDashboard() {
               {/* Description */}
               <div className="form-group">
                 <label htmlFor="funcDesc">Description</label>
-                <textarea
-                  id="funcDesc"
-                  className="form-textarea"
-                  rows={4}
-                  placeholder="Describe the functional requirement details..."
-                  value={newWorkDesc}
-                  onChange={(e) => setNewWorkDesc(e.target.value)}
-                  style={{ fontSize: '0.92rem' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    id="funcDesc"
+                    className="form-input"
+                    rows={4}
+                    placeholder="Describe the functional requirement details..."
+                    value={newWorkDesc}
+                    onChange={(e) => setNewWorkDesc(e.target.value)}
+                    style={{ fontSize: '0.92rem', resize: 'vertical' }}
+                  />
+                  <div style={{ position: 'absolute', bottom: '6px', right: '6px', pointerEvents: 'none' }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M10 2L2 10M10 6L6 10" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               {/* Assignee Selection */}
@@ -1847,11 +1867,11 @@ export default function EmployeeDashboard() {
                 <label>Attachment</label>
                 <div 
                   style={{
-                    border: '2px dashed var(--border-medium)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '24px',
+                    border: '1.5px dashed var(--border-medium)',
+                    borderRadius: '8px',
+                    padding: '30px 20px',
                     textAlign: 'center',
-                    background: '#F8FAFC',
+                    background: '#FAFCFD',
                     position: 'relative',
                     cursor: 'pointer',
                     transition: 'border-color 0.2s, background-color 0.2s'
@@ -1887,25 +1907,27 @@ export default function EmployeeDashboard() {
                     id="jiraFileInput"
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.8rem', color: 'var(--text-muted)' }}>☁️</span>
-                    <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '1.5rem', color: '#A5B4FC' }}>☁️</span>
+                    <span style={{ fontSize: '0.85rem', color: '#475569' }}>
                       Drop files to attach or{' '}
                       <label 
                         htmlFor="jiraFileInput" 
                         style={{
                           display: 'inline-block',
-                          padding: '4px 10px',
-                          background: 'rgba(0,0,0,0.04)',
-                          border: '1px solid var(--border-soft)',
+                          padding: '6px 14px',
+                          background: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
                           borderRadius: '4px',
-                          color: 'var(--text-primary)',
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
+                          color: '#334155',
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
                           cursor: 'pointer',
-                          marginLeft: '6px'
+                          marginLeft: '6px',
+                          textTransform: 'uppercase',
+                          marginBottom: 0
                         }}
                       >
-                        Browse
+                        BROWSE
                       </label>
                     </span>
                   </div>
@@ -1963,16 +1985,16 @@ export default function EmployeeDashboard() {
               </div>
 
               {/* Action Buttons Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginTop: '16px', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" style={{ background: '#FFFFFF', border: '1px solid var(--border-medium)', padding: '8px 24px', fontWeight: 600, fontSize: '0.85rem' }} onClick={() => { setShowCreateFunctional(false); setWorkTitleError(''); setProjectSelectError(''); }}>
                   Cancel
                 </button>
 
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button 
                     type="submit" 
                     className="btn btn-secondary" 
-                    style={{ borderColor: 'var(--border-medium)', color: 'var(--text-secondary)' }}
+                    style={{ background: '#FFFFFF', border: '1px solid var(--border-medium)', color: '#475569', padding: '8px 16px', fontWeight: 600, fontSize: '0.85rem' }}
                     onClick={() => setSubmissionType('copy')}
                     disabled={creatingWorkItem}
                   >
@@ -1981,7 +2003,7 @@ export default function EmployeeDashboard() {
                   <button 
                     type="submit" 
                     className="btn btn-secondary"
-                    style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    style={{ background: '#FFFFFF', border: '2px solid var(--primary)', color: 'var(--primary)', padding: '8px 16px', fontWeight: 700, fontSize: '0.85rem' }}
                     onClick={() => setSubmissionType('another')}
                     disabled={creatingWorkItem}
                   >
@@ -1990,6 +2012,7 @@ export default function EmployeeDashboard() {
                   <button 
                     type="submit" 
                     className="btn btn-primary" 
+                    style={{ padding: '8px 24px', fontWeight: 700, fontSize: '0.85rem', background: 'var(--primary)', color: '#FFFFFF', border: 'none' }}
                     onClick={() => setSubmissionType('standard')}
                     disabled={creatingWorkItem}
                   >
