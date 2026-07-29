@@ -1,20 +1,60 @@
 import React, { useEffect, useState } from 'react';
-import { api, DashboardResponseDto, BugDto } from '../services/api';
-import { toast } from '../services/toast';
+import { api, BugDto, AdminDashboardResponseDto, ProjectDto, EmployeeDropdownDto } from '../services/api';
 import { useDebounce } from '../hooks/useDebounce';
 import {
   Briefcase, CheckSquare, Bug, Users, Loader2,
-  AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
-  TrendingUp, Activity, Search
+  AlertTriangle, RefreshCw, ChevronRight, ChevronLeft,
+  ChevronsLeft, ChevronsRight,
+  Search, Filter, X, BarChart3, Clock
 } from 'lucide-react';
 
+// A single-ratio gauge (share of one whole) — deliberately not a 2-slice pie.
+// The track is a lighter step of the same ramp as the fill so "how full" reads
+// at a glance even before the number registers.
+function RadialMeter({
+  percent, size = 148, strokeWidth = 14, color, trackColor, sublabel,
+}: {
+  percent: number; size?: number; strokeWidth?: number; color: string; trackColor: string; sublabel?: string;
+}) {
+  const r = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: size * 0.24, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{Math.round(clamped)}%</span>
+        {sublabel && (
+          <span style={{ fontSize: Math.max(10, size * 0.08), color: 'var(--text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+            {sublabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardResponseDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [expandedEmployees, setExpandedEmployees] = useState<Record<number, boolean>>({});
-  const [newNoteText, setNewNoteText] = useState<Record<number, string>>({});
-  const [savingNote, setSavingNote] = useState<Record<number, boolean>>({});
+  // Filterable admin summary (projects/employees/date range) — the only
+  // dashboard data source for this page; the legacy /api/dashboard is not used.
+  const [adminData, setAdminData] = useState<AdminDashboardResponseDto | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+  const [adminError, setAdminError] = useState('');
+  const [projects, setProjects] = useState<ProjectDto[]>([]);
+  const [employeesList, setEmployeesList] = useState<EmployeeDropdownDto[]>([]);
+  const [filterProjectId, setFilterProjectId] = useState('');
+  const [filterEmployeeId, setFilterEmployeeId] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState('');
+  const [filterToDate, setFilterToDate] = useState('');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   // Bugs Queue state (PM)
   const [pmBugs, setPmBugs] = useState<BugDto[]>([]);
@@ -27,52 +67,46 @@ export default function Dashboard() {
   const [pmBugsLoading, setPmBugsLoading] = useState(false);
   const PM_BUG_PAGE_SIZE = 10;
 
-  const handleNoteChange = (empId: number, text: string) => {
-    setNewNoteText(prev => ({ ...prev, [empId]: text }));
-  };
-
-  const handleSaveNote = async (empId: number) => {
-    const text = newNoteText[empId];
-    if (!text || !text.trim()) return;
-    setSavingNote(prev => ({ ...prev, [empId]: true }));
+  // Fetch admin dashboard summary (KPIs, status counts, employee breakdown)
+  const fetchAdminDashboard = async () => {
+    setAdminLoading(true);
     try {
-      const res = await api.addEmployeeNote(empId, text);
+      const res = await api.getAdminDashboard({
+        projectId: filterProjectId ? Number(filterProjectId) : undefined,
+        employeeId: filterEmployeeId ? Number(filterEmployeeId) : undefined,
+        fromDate: filterFromDate || undefined,
+        toDate: filterToDate || undefined,
+      });
       if (res.success) {
-        setNewNoteText(prev => ({ ...prev, [empId]: '' }));
-        fetchDashboard();
-        toast.success('Daily status note saved successfully!');
+        setAdminData(res.data);
+        setAdminError('');
+        setLastUpdatedAt(new Date());
       } else {
-        toast.error(res.message || 'Failed to save note');
+        setAdminError(res.message || 'Failed to fetch admin dashboard data');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error saving note');
+      setAdminError(err.message || 'Failed to connect to API server');
     } finally {
-      setSavingNote(prev => ({ ...prev, [empId]: false }));
+      setAdminLoading(false);
     }
   };
 
-  const toggleEmployee = (empId: number) => {
-    setExpandedEmployees(prev => ({ ...prev, [empId]: !prev[empId] }));
+  useEffect(() => { fetchAdminDashboard(); }, [filterProjectId, filterEmployeeId, filterFromDate, filterToDate]);
+
+  // Load filter dropdown options once
+  useEffect(() => {
+    api.getAllProjects().then(res => { if (res.success) setProjects(res.data); }).catch(() => {});
+    api.getEmployeesDropdown().then(res => { if (res.success) setEmployeesList(res.data); }).catch(() => {});
+  }, []);
+
+  const clearFilters = () => {
+    setFilterProjectId('');
+    setFilterEmployeeId('');
+    setFilterFromDate('');
+    setFilterToDate('');
   };
 
-  const fetchDashboard = async () => {
-    setLoading(true);
-    try {
-      const res = await api.getDashboard();
-      if (res.success) {
-        setData(res.data);
-        setError('');
-      } else {
-        setError(res.message || 'Failed to fetch dashboard data');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect to API server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchDashboard(); }, []);
+  const hasActiveFilters = !!(filterProjectId || filterEmployeeId || filterFromDate || filterToDate);
 
   // Fetch all bugs for PM (paginated + filtered)
   const fetchPmBugs = async () => {
@@ -110,7 +144,7 @@ export default function Dashboard() {
     fetchPmBugs();
   }, [pmBugPage, pmBugStatus, pmBugDate, debouncedPmBugSearch]);
 
-  if (loading) {
+  if (adminLoading && !adminData) {
     return (
       <div className="loading-center">
         <Loader2 className="spinner" size={28} color="var(--primary)" />
@@ -119,7 +153,7 @@ export default function Dashboard() {
     );
   }
 
-  if (error || !data) {
+  if (!adminData) {
     return (
       <div className="glass-panel" style={{
         padding: '30px', display: 'flex', alignItems: 'center', gap: '14px',
@@ -128,8 +162,8 @@ export default function Dashboard() {
         <AlertTriangle size={24} color="var(--danger)" />
         <div>
           <h3 style={{ color: 'var(--danger)', marginBottom: '4px' }}>Error loading Dashboard</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{error || 'No data returned.'}</p>
-          <button className="btn btn-secondary" onClick={fetchDashboard} style={{ marginTop: '12px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{adminError || 'No data returned.'}</p>
+          <button className="btn btn-secondary" onClick={fetchAdminDashboard} style={{ marginTop: '12px' }}>
             Retry Fetch
           </button>
         </div>
@@ -137,14 +171,13 @@ export default function Dashboard() {
     );
   }
 
-  const { workItemStatusCount, bugStatusCount, employeeWorkItemCounts } = data;
-  const totalTasks = data.totalWorkItems;
-  const totalBugs  = data.totalBugs;
+  const { totalProjects, totalEmployees, totalWorkItems, totalBugs, statusCounts, employeeBreakdown } = adminData;
 
   const kpiCards = [
     {
       label: 'Total Projects',
-      value: data.totalProjects,
+      value: totalProjects,
+      sub: 'Across the organization',
       icon: <Briefcase size={24} />,
       color: 'var(--primary)',
       glow: 'var(--primary-glow)',
@@ -153,7 +186,8 @@ export default function Dashboard() {
     },
     {
       label: 'Work Items',
-      value: totalTasks,
+      value: totalWorkItems,
+      sub: 'Tracked deliverables',
       icon: <CheckSquare size={24} />,
       color: 'var(--info)',
       glow: 'var(--info-glow)',
@@ -161,8 +195,9 @@ export default function Dashboard() {
       accent: 'hsla(200,90%,60%,0.12)',
     },
     {
-      label: 'Active Bugs',
-      value: bugStatusCount.open + bugStatusCount.inProgress,
+      label: 'Total Bugs',
+      value: totalBugs,
+      sub: `${statusCounts.fixed} fixed`,
       icon: <Bug size={24} />,
       color: 'var(--danger)',
       glow: 'var(--danger-glow)',
@@ -170,8 +205,9 @@ export default function Dashboard() {
       accent: 'hsla(350,85%,62%,0.12)',
     },
     {
-      label: 'Active Employees',
-      value: employeeWorkItemCounts.length,
+      label: 'Total Employees',
+      value: totalEmployees,
+      sub: 'Actively assigned',
       icon: <Users size={24} />,
       color: 'var(--success)',
       glow: 'var(--success-glow)',
@@ -180,20 +216,20 @@ export default function Dashboard() {
     },
   ];
 
-  const workStatuses = [
-    { label: 'Pending',     count: workItemStatusCount.pending,    color: '#64748b', light: 'rgba(100,116,139,0.25)' },
-    { label: 'In Progress', count: workItemStatusCount.inProgress, color: '#f59e0b', light: 'rgba(245,158,11,0.25)' },
-    { label: 'Completed',   count: workItemStatusCount.completed,  color: '#34d399', light: 'rgba(52,211,153,0.25)' },
-    { label: 'Testing',     count: workItemStatusCount.testing,    color: '#60a5fa', light: 'rgba(96,165,250,0.25)' },
-    { label: 'Bug Found',   count: workItemStatusCount.bugFound,   color: '#f87171', light: 'rgba(248,113,113,0.25)' },
-    { label: 'Closed',      count: workItemStatusCount.closed,     color: '#475569', light: 'rgba(71,85,105,0.25)' },
-  ];
-
-  const bugStatuses = [
-    { label: 'Open',        count: bugStatusCount.open,       color: '#f87171', light: 'rgba(248,113,113,0.25)' },
-    { label: 'In Progress', count: bugStatusCount.inProgress, color: '#f59e0b', light: 'rgba(245,158,11,0.25)' },
-    { label: 'Fixed',       count: bugStatusCount.fixed,      color: '#34d399', light: 'rgba(52,211,153,0.25)' },
-    { label: 'Closed',      count: bugStatusCount.closed,     color: '#475569', light: 'rgba(71,85,105,0.25)' },
+  // Colors are a validated categorical set (adjacent-pair CVD + normal-vision
+  // separation checked with the dataviz palette validator) rather than picked
+  // by eye. "Closed" is deliberately a de-emphasis neutral, not a categorical
+  // hue — it reads as archived, not as active data.
+  const statusCards = [
+    { label: 'Assigned',       value: statusCounts.assigned,     color: '#1baf7a' },
+    { label: 'Closed',         value: statusCounts.closed,       color: '#94a3b8' },
+    { label: 'Completed',      value: statusCounts.completed,    color: '#008300' },
+    { label: 'Fixed',          value: statusCounts.fixed,        color: '#eda100' },
+    { label: 'Future Release', value: statusCounts.futureRelease, color: '#4a3aa7' },
+    { label: 'In Progress',    value: statusCounts.inProgress,   color: '#eb6834' },
+    { label: 'Open',           value: statusCounts.open,         color: '#e34948' },
+    { label: 'Reopen',         value: statusCounts.reopen,       color: '#e87ba4' },
+    { label: 'To Do',          value: statusCounts.todo,         color: '#2a78d6' },
   ];
 
   return (
@@ -204,11 +240,124 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p>Project health, workloads and bug metrics.</p>
         </div>
-        <button className="btn btn-secondary" onClick={fetchDashboard} style={{ gap: '8px' }}>
-          <RefreshCw size={16} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {lastUpdatedAt && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <Clock size={13} />
+              Updated {lastUpdatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button className="btn btn-secondary" onClick={fetchAdminDashboard} style={{ gap: '8px' }}>
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Filters */}
+      <div className="glass-panel" style={{ padding: '18px 20px', marginBottom: '20px', display: 'flex', alignItems: 'flex-end', gap: '18px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 700, paddingBottom: '9px' }}>
+          <Filter size={15} color="var(--primary-hover)" />
+          Filters
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Project</label>
+          <select
+            className="form-select"
+            value={filterProjectId}
+            onChange={(e) => setFilterProjectId(e.target.value)}
+            style={{ width: '210px', height: '38px', fontSize: '0.85rem' }}
+          >
+            <option value="">All Projects</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Employee</label>
+          <select
+            className="form-select"
+            value={filterEmployeeId}
+            onChange={(e) => setFilterEmployeeId(e.target.value)}
+            style={{ width: '210px', height: '38px', fontSize: '0.85rem' }}
+          >
+            <option value="">All Employees</option>
+            {employeesList.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>From Date</label>
+          <input
+            type="date"
+            className="form-input"
+            value={filterFromDate}
+            max={filterToDate || undefined}
+            onChange={(e) => setFilterFromDate(e.target.value)}
+            style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>To Date</label>
+          <input
+            type="date"
+            className="form-input"
+            value={filterToDate}
+            min={filterFromDate || undefined}
+            onChange={(e) => setFilterToDate(e.target.value)}
+            style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button className="btn btn-secondary" onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 14px', height: '38px', fontSize: '0.82rem' }}>
+            <X size={14} />
+            Clear
+          </button>
+        )}
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '9px' }}>
+          {adminLoading && <Loader2 size={16} className="spinner" style={{ color: 'var(--primary)' }} />}
+          {adminError && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)', fontSize: '0.8rem' }}>
+              <AlertTriangle size={14} />
+              {adminError}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '-8px', marginBottom: '20px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active filters:</span>
+          {filterProjectId && (
+            <span className="badge badge-assigned" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Project: {projects.find(p => String(p.id) === filterProjectId)?.name || filterProjectId}
+              <X size={12} style={{ cursor: 'pointer' }} onClick={() => setFilterProjectId('')} />
+            </span>
+          )}
+          {filterEmployeeId && (
+            <span className="badge badge-assigned" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Employee: {employeesList.find(e => String(e.id) === filterEmployeeId)?.name || filterEmployeeId}
+              <X size={12} style={{ cursor: 'pointer' }} onClick={() => setFilterEmployeeId('')} />
+            </span>
+          )}
+          {filterFromDate && (
+            <span className="badge badge-assigned" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              From: {filterFromDate}
+              <X size={12} style={{ cursor: 'pointer' }} onClick={() => setFilterFromDate('')} />
+            </span>
+          )}
+          {filterToDate && (
+            <span className="badge badge-assigned" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              To: {filterToDate}
+              <X size={12} style={{ cursor: 'pointer' }} onClick={() => setFilterToDate('')} />
+            </span>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="dashboard-grid" style={{ marginBottom: '28px' }}>
@@ -225,8 +374,7 @@ export default function Dashboard() {
               <h3>{card.label}</h3>
               <p style={{ color: card.color }}>{card.value}</p>
               <div className="stat-trend">
-                <TrendingUp size={12} />
-                <span>Active</span>
+                <span>{card.sub}</span>
               </div>
             </div>
             <div className="stat-icon" style={{ background: card.bg, color: card.color, boxShadow: `0 0 20px ${card.glow}` }}>
@@ -236,74 +384,28 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Status Breakdowns */}
-      <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
-        {/* Work Items */}
-        <div className="glass-panel" style={{ padding: '28px' }}>
-          <div className="section-header" style={{ marginBottom: '22px', flexWrap: 'wrap', gap: '8px' }}>
-            <div className="section-title">
-              <CheckSquare size={18} color="var(--primary-hover)" />
-              Work Item Status Breakdown
-            </div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalTasks} total</span>
+      {/* Status Counts */}
+      <div className="glass-panel" style={{ padding: '28px', marginBottom: '28px' }}>
+        <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="section-title">
+            <BarChart3 size={18} color="var(--primary-hover)" />
+            Status Counts
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {workStatuses.map(s => {
-              const pct = totalTasks > 0 ? (s.count / totalTasks) * 100 : 0;
-              return (
-                <div key={s.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '7px', fontSize: '0.87rem' }}>
-                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>{s.label}</span>
-                    <span style={{ color: s.color, fontWeight: 700 }}>{s.count} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({pct.toFixed(0)}%)</span></span>
-                  </div>
-                  <div className="progress-bar-track">
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${pct}%`,
-                        background: `linear-gradient(90deg, ${s.color}aa, ${s.color})`,
-                        boxShadow: `0 0 8px ${s.light}`
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalWorkItems + totalBugs} total (work items + bugs)</span>
         </div>
-
-        {/* Bug Statuses */}
-        <div className="glass-panel" style={{ padding: '28px' }}>
-          <div className="section-header" style={{ marginBottom: '22px', flexWrap: 'wrap', gap: '8px' }}>
-            <div className="section-title">
-              <Bug size={18} color="var(--danger)" />
-              Bug Status Breakdown
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+          {statusCards.map(s => (
+            <div
+              key={s.label}
+              className="glass-panel"
+              style={{ padding: '16px 18px', borderLeft: `4px solid ${s.color}`, boxShadow: 'var(--shadow-sm)' }}
+            >
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 700, color: s.color }}>{s.value}</div>
             </div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalBugs} total</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {bugStatuses.map(s => {
-              const pct = totalBugs > 0 ? (s.count / totalBugs) * 100 : 0;
-              return (
-                <div key={s.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '7px', fontSize: '0.87rem' }}>
-                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>{s.label}</span>
-                    <span style={{ color: s.color, fontWeight: 700 }}>{s.count} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({pct.toFixed(0)}%)</span></span>
-                  </div>
-                  <div className="progress-bar-track">
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${pct}%`,
-                        background: `linear-gradient(90deg, ${s.color}aa, ${s.color})`,
-                        boxShadow: `0 0 8px ${s.light}`
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          ))}
         </div>
       </div>
 
@@ -311,15 +413,15 @@ export default function Dashboard() {
       <div className="glass-panel" style={{ padding: '28px' }}>
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
-            <Activity size={18} color="var(--secondary)" />
+            <Users size={18} color="var(--secondary)" />
             Employee Workloads &amp; Task Distribution
           </div>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            {employeeWorkItemCounts.length} employees
+            {employeeBreakdown.length} employees
           </span>
         </div>
 
-        {employeeWorkItemCounts.length === 0 ? (
+        {employeeBreakdown.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon"><Users size={28} /></div>
             <h3>No active employees registered yet.</h3>
@@ -334,189 +436,42 @@ export default function Dashboard() {
                   <th>Total</th>
                   <th>To Do / Assigned / Reopen</th>
                   <th>In Progress</th>
+                  <th>Open</th>
                   <th>Resolved</th>
+                  <th>Closed</th>
                   <th>Progress</th>
-                  <th>Last Update</th>
                 </tr>
               </thead>
               <tbody>
-                {employeeWorkItemCounts.map(emp => {
-                  const compPct = emp.totalAssigned > 0 ? (emp.completed / emp.totalAssigned) * 100 : 0;
-                  const isExpanded = !!expandedEmployees[emp.employeeId];
+                {employeeBreakdown.map(emp => {
+                  const resolved = emp.fixed + emp.completed;
+                  const compPct = emp.totalAssigned > 0 ? (resolved / emp.totalAssigned) * 100 : 0;
                   return (
-                    <React.Fragment key={emp.employeeId}>
-                      <tr
-                        onClick={() => toggleEmployee(emp.employeeId)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              width: '32px', height: '32px', borderRadius: '50%',
-                              background: 'linear-gradient(135deg, var(--primary-dark), hsl(185,80%,40%))',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '0.75rem', fontWeight: 700, color: '#fff', flexShrink: 0,
-                              border: '1px solid rgba(14,165,233,0.3)'
-                            }}>
-                              {emp.employeeName.charAt(0).toUpperCase()}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              {isExpanded
-                                ? <ChevronDown size={14} color="var(--text-muted)" />
-                                : <ChevronRight size={14} color="var(--text-muted)" />
-                              }
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{emp.employeeName}</span>
-                            </div>
+                    <tr key={emp.employeeId}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '50%',
+                            background: 'linear-gradient(135deg, var(--primary-dark), hsl(185,80%,40%))',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.75rem', fontWeight: 700, color: '#fff', flexShrink: 0,
+                            border: '1px solid rgba(14,165,233,0.3)'
+                          }}>
+                            {emp.employeeName.charAt(0).toUpperCase()}
                           </div>
-                        </td>
-                        <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{emp.totalAssigned}</span></td>
-                        <td style={{ color: 'var(--text-muted)' }}>{emp.pending}</td>
-                        <td><span style={{ color: '#38bdf8', fontWeight: 600 }}>{emp.inProgress}</span></td>
-                        <td><span style={{ color: '#4ade80', fontWeight: 600 }}>{emp.completed}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '100px' }}>
-                            <div className="progress-bar-track" style={{ flex: 1, height: '6px' }}>
-                              <div
-                                className="progress-bar-fill"
-                                style={{
-                                  width: `${compPct}%`,
-                                  background: 'linear-gradient(90deg, var(--success), hsl(158,64%,70%))',
-                                  boxShadow: '0 0 6px var(--success-glow)'
-                                }}
-                              />
-                            </div>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                              {compPct.toFixed(0)}%
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          {emp.latestNote ? (
-                            <div>
-                              <div style={{ fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px', color: 'var(--text-secondary)', fontWeight: 500 }} title={emp.latestNote}>
-                                {emp.latestNote}
-                              </div>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                {new Date(emp.latestNoteDate!).toLocaleDateString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--text-disabled)', fontSize: '0.82rem', fontStyle: 'italic' }}>No notes yet</span>
-                          )}
-                        </td>
-                      </tr>
-
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={9} style={{ padding: '0', border: 'none' }}>
-                            <div style={{
-                              margin: '0 16px 16px',
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                              gap: '16px',
-                              background: 'rgba(14,165,233,0.04)',
-                              borderRadius: 'var(--radius-md)',
-                              padding: '20px',
-                              border: '1px solid rgba(14,165,233,0.15)',
-                              animation: 'fadeInUp 0.25s var(--ease-out) both'
-                            }}>
-                              {/* Assigned Tasks */}
-                              <div>
-                                <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <CheckSquare size={14} color="var(--primary-hover)" />
-                                  Assigned Tasks ({emp.assignedTasks?.length || 0})
-                                </h4>
-                                {!emp.assignedTasks || emp.assignedTasks.length === 0 ? (
-                                  <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No active tasks assigned.</p>
-                                ) : (
-                                  <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                                       <thead>
-                                         <tr>
-                                           {['Task #', 'Client', 'Project', 'Product', 'Module', 'Title', 'Status', 'Priority'].map(h => (
-                                             <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-soft)' }}>{h}</th>
-                                           ))}
-                                         </tr>
-                                       </thead>
-                                       <tbody>
-                                         {emp.assignedTasks.map(task => (
-                                           <tr key={task.id}>
-                                             <td style={{ padding: '8px 8px', fontWeight: 600 }}>
-                                               <a href={`/projects/${task.projectId}`} style={{ color: 'var(--primary-hover)', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>
-                                                 {task.workNumber}
-                                               </a>
-                                             </td>
-                                             <td style={{ padding: '8px 8px', color: 'var(--text-secondary)' }}>
-                                               {task.clientName ? <span className="badge badge-assigned" style={{ fontSize: '0.72rem', padding: '2px 6px' }}>{task.clientName}</span> : <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>-</span>}
-                                             </td>
-                                             <td style={{ padding: '8px 8px', color: 'var(--text-muted)', fontWeight: 500 }}>{task.projectName}</td>
-                                             <td style={{ padding: '8px 8px', color: 'var(--text-secondary)' }}>
-                                               {task.productName ? <span style={{ fontWeight: 500 }}>{task.productName}</span> : <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>-</span>}
-                                             </td>
-                                             <td style={{ padding: '8px 8px', color: 'var(--text-secondary)' }}>
-                                               {task.moduleName ? <span style={{ color: '#c084fc', fontWeight: 500 }}>{task.moduleName}</span> : <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>-</span>}
-                                             </td>
-                                             <td style={{ padding: '8px 8px', color: 'var(--text-secondary)' }}>{task.title}</td>
-                                             <td style={{ padding: '8px 8px' }}>
-                                               <span className={`badge badge-${task.status}`}>{formatStatus(task.status)}</span>
-                                             </td>
-                                             <td style={{ padding: '8px 8px' }}>
-                                               <span className={`badge badge-${task.priority}`}>{task.priority}</span>
-                                             </td>
-                                           </tr>
-                                         ))}
-                                       </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Daily Status Diary */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Users size={14} color="var(--secondary)" />
-                                  Daily Status Diary
-                                </h4>
-                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <textarea
-                                    placeholder="Type today's status update..."
-                                    value={newNoteText[emp.employeeId] || ''}
-                                    onChange={e => handleNoteChange(emp.employeeId, e.target.value)}
-                                    className="form-textarea"
-                                    style={{ minHeight: '60px', fontSize: '0.83rem' }}
-                                  />
-                                  <button
-                                    className="btn btn-primary"
-                                    onClick={() => handleSaveNote(emp.employeeId)}
-                                    disabled={savingNote[emp.employeeId] || !newNoteText[emp.employeeId]?.trim()}
-                                    style={{ padding: '7px 14px', fontSize: '0.8rem', alignSelf: 'flex-end' }}
-                                  >
-                                    {savingNote[emp.employeeId] ? 'Saving...' : 'Save Note'}
-                                  </button>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto' }}>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>History Log</span>
-                                  {!emp.noteHistory || emp.noteHistory.length === 0 ? (
-                                    <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No diary entries logged yet.</p>
-                                  ) : (
-                                    emp.noteHistory.map(note => (
-                                      <div key={note.id} style={{ borderLeft: '2px solid var(--primary)', paddingLeft: '10px', marginLeft: '4px', fontSize: '0.8rem' }}>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '4px', marginBottom: '3px' }}>
-                                          <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{note.createdByName}</span>
-                                          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{new Date(note.createdAt).toLocaleDateString()}</span>
-                                        </div>
-                                        <p style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5, wordBreak: 'break-word' }}>{note.noteText}</p>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{emp.employeeName}</span>
+                        </div>
+                      </td>
+                      <td><span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{emp.totalAssigned}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{emp.todo + emp.assigned + emp.reopen}</td>
+                      <td><span style={{ color: '#38bdf8', fontWeight: 600 }}>{emp.inProgress}</span></td>
+                      <td><span style={{ color: '#f87171', fontWeight: 600 }}>{emp.open}</span></td>
+                      <td><span style={{ color: '#4ade80', fontWeight: 600 }}>{resolved}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{emp.closed}</td>
+                      <td>
+                        <RadialMeter percent={compPct} size={38} strokeWidth={4} color="var(--success)" trackColor="var(--success-glow)" />
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -526,20 +481,18 @@ export default function Dashboard() {
       </div>
 
       {/* ====== PM BUGS QUEUE ====== */}
-      <div className="glass-panel" style={{ padding: '24px', marginTop: '28px' }}>
+      <div className="glass-panel" style={{ padding: '28px', marginTop: '28px' }}>
+        <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="section-title">
+            <Bug size={18} color="var(--danger)" />
+            All Bugs Queue
+          </div>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{pmBugsTotalCount} bugs</span>
+        </div>
+
         {/* Filter bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bug size={20} color="var(--danger)" />
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              All Bugs Queue
-            </h3>
-            <span style={{ background: 'var(--danger-glow)', color: 'var(--danger)', borderRadius: '999px', padding: '2px 10px', fontSize: '0.8rem', fontWeight: 600 }}>
-              {pmBugsTotalCount}
-            </span>
-          </div>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '220px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
             <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
               type="text"
@@ -547,14 +500,14 @@ export default function Dashboard() {
               placeholder="Search title or BUG-001..."
               value={pmBugSearch}
               onChange={(e) => setPmBugSearch(e.target.value)}
-              style={{ paddingLeft: '12px', height: '36px', fontSize: '0.85rem' }}
+              style={{ paddingLeft: '12px', height: '38px', fontSize: '0.85rem' }}
             />
           </div>
           <select
             className="form-select"
             value={pmBugStatus}
             onChange={(e) => setPmBugStatus(e.target.value)}
-            style={{ width: '155px', height: '36px', paddingTop: 0, paddingBottom: 0, paddingRight: '30px', paddingLeft: '12px', fontSize: '0.85rem' }}
+            style={{ width: '155px', height: '38px', paddingTop: 0, paddingBottom: 0, paddingRight: '30px', paddingLeft: '12px', fontSize: '0.85rem' }}
           >
             <option value="all">All Statuses</option>
             <option value="open">Open</option>
@@ -569,7 +522,7 @@ export default function Dashboard() {
               className="form-input"
               value={pmBugDate}
               onChange={(e) => setPmBugDate(e.target.value)}
-              style={{ width: '145px', height: '36px', cursor: 'pointer', padding: '0 8px', fontSize: '0.85rem' }}
+              style={{ width: '145px', height: '38px', cursor: 'pointer', padding: '0 8px', fontSize: '0.85rem' }}
             />
             {pmBugDate && (
               <button
@@ -637,27 +590,72 @@ export default function Dashboard() {
         )}
 
         {/* Bugs Pagination */}
-        {pmBugsTotalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px', borderTop: '1px solid var(--border-soft)', paddingTop: '16px' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setPmBugPage(prev => Math.max(prev - 1, 1))}
-              disabled={pmBugPage === 1}
-              style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-            >
-              Previous
-            </button>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Page {pmBugPage} of {pmBugsTotalPages}
+        {pmBugsTotalCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginTop: '20px', borderTop: '1px solid var(--border-soft)', paddingTop: '16px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Showing <strong style={{ color: 'var(--text-secondary)' }}>{(pmBugPage - 1) * PM_BUG_PAGE_SIZE + 1}</strong>
+              {'–'}
+              <strong style={{ color: 'var(--text-secondary)' }}>{Math.min(pmBugPage * PM_BUG_PAGE_SIZE, pmBugsTotalCount)}</strong>
+              {' of '}
+              <strong style={{ color: 'var(--text-secondary)' }}>{pmBugsTotalCount}</strong> bugs
             </span>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setPmBugPage(prev => Math.min(prev + 1, pmBugsTotalPages))}
-              disabled={pmBugPage === pmBugsTotalPages}
-              style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-            >
-              Next
-            </button>
+
+            {pmBugsTotalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setPmBugPage(1)}
+                  disabled={pmBugPage === 1}
+                  title="First page"
+                  style={{ padding: '6px 8px' }}
+                >
+                  <ChevronsLeft size={15} />
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setPmBugPage(prev => Math.max(prev - 1, 1))}
+                  disabled={pmBugPage === 1}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '0.82rem' }}
+                >
+                  <ChevronLeft size={14} />
+                  Prev
+                </button>
+
+                {getPageNumbers(pmBugPage, pmBugsTotalPages).map((p, idx) =>
+                  p === 'ellipsis' ? (
+                    <span key={`ellipsis-${idx}`} style={{ padding: '0 4px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>&hellip;</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPmBugPage(p)}
+                      className={p === pmBugPage ? 'btn btn-primary' : 'btn btn-secondary'}
+                      style={{ minWidth: '34px', height: '34px', padding: 0, fontSize: '0.82rem', fontWeight: p === pmBugPage ? 700 : 500 }}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setPmBugPage(prev => Math.min(prev + 1, pmBugsTotalPages))}
+                  disabled={pmBugPage === pmBugsTotalPages}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '0.82rem' }}
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setPmBugPage(pmBugsTotalPages)}
+                  disabled={pmBugPage === pmBugsTotalPages}
+                  title="Last page"
+                  style={{ padding: '6px 8px' }}
+                >
+                  <ChevronsRight size={15} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -665,16 +663,14 @@ export default function Dashboard() {
   );
 }
 
-const formatStatus = (status: string) => {
-  if (!status) return '';
-  switch (status.toLowerCase()) {
-    case 'pending': return 'TO DO';
-    case 'assigned': return 'ASSIGNED';
-    case 'reopened': return 'REOPEN';
-    case 'in_progress': return 'IN PROGRESS';
-    case 'waiting_customer': return 'WAITING FOR CUSTOMER';
-    case 'future_release': return 'MOVED TO FUTURE RELEASE';
-    case 'completed': return 'RESOLVED';
-    default: return status.toUpperCase().replace('_', ' ');
-  }
+const getPageNumbers = (current: number, total: number): (number | 'ellipsis')[] => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | 'ellipsis')[] = [1];
+  if (current > 3) pages.push('ellipsis');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (current < total - 2) pages.push('ellipsis');
+  pages.push(total);
+  return pages;
 };

@@ -248,6 +248,54 @@ export interface DashboardResponseDto {
   employeeWorkItemCounts: EmployeeWorkItemCountDto[];
 }
 
+export interface AdminStatusCountsDto {
+  todo: number;
+  assigned: number;
+  reopen: number;
+  inProgress: number;
+  futureRelease: number;
+  fixed: number;
+  completed: number;
+  closed: number;
+  open: number;
+}
+
+export interface AdminEmployeeBreakdownDto {
+  employeeId: number;
+  employeeName: string;
+  totalAssigned: number;
+  todo: number;
+  assigned: number;
+  reopen: number;
+  inProgress: number;
+  futureRelease: number;
+  fixed: number;
+  completed: number;
+  closed: number;
+  open: number;
+}
+
+export interface AdminDashboardResponseDto {
+  totalProjects: number;
+  totalEmployees: number;
+  totalWorkItems: number;
+  totalBugs: number;
+  statusCounts: AdminStatusCountsDto;
+  employeeBreakdown: AdminEmployeeBreakdownDto[];
+}
+
+export interface EmployeeAssignedProjectDto {
+  projectId: number;
+  projectName: string;
+}
+
+export interface EmployeeDashboardResponseDto {
+  totalAssigned: number;
+  totalProjects: number;
+  statusCounts: AdminStatusCountsDto;
+  assignedProjects: EmployeeAssignedProjectDto[];
+}
+
 // Request Helper
 async function request<T>(
   url: string,
@@ -296,6 +344,39 @@ async function request<T>(
   }
 
   return json as ApiResponse<T>;
+}
+
+async function requestCsvExport(
+  url: string,
+  params: Record<string, string | number | undefined>
+): Promise<{ blob: Blob; filename: string | null }> {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      q.set(key, String(value));
+    }
+  });
+
+  const token = localStorage.getItem('token');
+  const headers = new Headers();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${API_BASE_URL}${url}?${q}`, { headers });
+
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) {
+    throw new Error(`Export failed with status ${res.status}`);
+  }
+
+  const disposition = res.headers.get('content-disposition');
+  const match = disposition && /filename="?([^";]+)"?/i.exec(disposition);
+
+  return { blob: await res.blob(), filename: match ? match[1] : null };
 }
 
 // API methods
@@ -351,6 +432,23 @@ export const api = {
 
   // Dashboard
   getDashboard: () => request<DashboardResponseDto>('/api/dashboard'),
+
+  getAdminDashboard: (params: { projectId?: number; employeeId?: number; fromDate?: string; toDate?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.projectId)  q.set('projectId',  String(params.projectId));
+    if (params.employeeId) q.set('employeeId', String(params.employeeId));
+    if (params.fromDate)   q.set('fromDate',   params.fromDate);
+    if (params.toDate)     q.set('toDate',     params.toDate);
+    return request<AdminDashboardResponseDto>(`/api/Dashboard/admin?${q}`);
+  },
+
+  getEmployeeDashboard: (params: { projectId?: number; fromDate?: string; toDate?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.projectId) q.set('projectId', String(params.projectId));
+    if (params.fromDate)  q.set('fromDate',  params.fromDate);
+    if (params.toDate)    q.set('toDate',    params.toDate);
+    return request<EmployeeDashboardResponseDto>(`/api/Dashboard/employee?${q}`);
+  },
 
   // Projects
   getAllProjects: () => request<ProjectDto[]>('/api/project'),
@@ -675,6 +773,37 @@ export const api = {
     request<string>('/api/auth/profile-picture', {
       method: 'DELETE',
     }),
+
+  getExportColumns: () => request<string[]>('/api/Dashboard/export/columns'),
+
+  exportAdminCsv: (params: {
+    projectId?: number;
+    employeeId?: number;
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    priority?: string;
+    workType?: string;
+    moduleId?: number;
+    clientId?: number;
+    raisedBuild?: string;
+    fixedBuild?: string;
+    columns?: string;
+  } = {}) => requestCsvExport('/api/Dashboard/admin/export', params),
+
+  exportEmployeeCsv: (params: {
+    projectId?: number;
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    priority?: string;
+    workType?: string;
+    moduleId?: number;
+    clientId?: number;
+    raisedBuild?: string;
+    fixedBuild?: string;
+    columns?: string;
+  } = {}) => requestCsvExport('/api/Dashboard/employee/export', params),
 
   importJiraCsv: (file: File) => {
     const formData = new FormData();

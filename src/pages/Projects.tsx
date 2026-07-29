@@ -88,6 +88,9 @@ export default function Projects() {
   const [workItemAssigneeFilter, setWorkItemAssigneeFilter] = useState('all');
   const [workItemDateFilter, setWorkItemDateFilter] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('grid');
+  const [exportColumnsOptions, setExportColumnsOptions] = useState<string[]>([]);
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>([]);
+  const [exportColumnsDropdownOpen, setExportColumnsDropdownOpen] = useState(false);
 
   const KANBAN_COLUMNS = [
     { id: 'pending', title: 'TO DO', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.04)', border: 'rgba(148, 163, 184, 0.15)' },
@@ -681,22 +684,26 @@ export default function Projects() {
     if (!selectedProject) return;
 
     try {
-      const itemsRes = await api.getWorkItemsByProject(selectedProject.id);
-      const itemsToExport = itemsRes.success ? itemsRes.data : [];
+      const assigneeEmployeeId = workItemAssigneeFilter !== 'all' && workItemAssigneeFilter !== 'unassigned'
+        ? employees.find(e => e.name === workItemAssigneeFilter)?.id
+        : undefined;
 
-      if (itemsToExport.length === 0) {
-        toast.info('No issues found to export for this project.');
-        return;
-      }
+      const { blob, filename } = await api.exportAdminCsv({
+        projectId: selectedProject.id,
+        employeeId: assigneeEmployeeId,
+        status: workItemStatusFilters.length > 0 ? workItemStatusFilters.join(',') : undefined,
+        columns: selectedExportColumns.length > 0 ? selectedExportColumns.join(',') : undefined,
+      });
 
-      const allRows = await buildIssueRowsForWorkItems(itemsToExport, selectedProject.projectNumber, selectedProject.name);
-
-      if (allRows.length === 0) {
-        toast.info('No issues found to export for this project.');
-        return;
-      }
-
-      downloadCSV(`teamtrack_${selectedProject.projectNumber}_issues_export.csv`, rowsToCsvContent(allRows));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || `teamtrack_${selectedProject.projectNumber}_export.csv`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (err: any) {
       toast.error('Failed to export project CSV: ' + err.message);
     }
@@ -730,6 +737,15 @@ export default function Projects() {
       const res = await api.getClients();
       if (res.success) {
         setClients(res.data);
+      }
+    } catch (err) {}
+  };
+
+  const fetchExportColumns = async () => {
+    try {
+      const res = await api.getExportColumns();
+      if (res.success) {
+        setExportColumnsOptions(res.data);
       }
     } catch (err) {}
   };
@@ -1113,6 +1129,7 @@ export default function Projects() {
     fetchEmployees();
     fetchClients();
     fetchAllProjects();
+    fetchExportColumns();
   }, []);
 
   // Debounce search text so we don't fire an API call on every keystroke
@@ -1619,6 +1636,121 @@ export default function Projects() {
                   </button>
                 </div>
               )}
+              {/* Checkbox Multi-Select Export Columns Dropdown */}
+              <div style={{ position: 'relative', width: '170px' }}>
+                <button
+                  type="button"
+                  className="form-select"
+                  onClick={() => setExportColumnsDropdownOpen(!exportColumnsDropdownOpen)}
+                  style={{
+                    width: '170px',
+                    textAlign: 'left',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    background: '#F8FAFC',
+                    border: '1px solid var(--border-soft)',
+                    color: 'var(--text-primary)',
+                    height: '38px',
+                    padding: '0 30px 0 12px',
+                    borderRadius: 'var(--radius-md)',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {selectedExportColumns.length === 0
+                    ? 'All Columns'
+                    : `${selectedExportColumns.length} Column${selectedExportColumns.length > 1 ? 's' : ''}`}
+                </button>
+
+                {exportColumnsDropdownOpen && (
+                  <>
+                    <div
+                      onClick={() => setExportColumnsDropdownOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                    />
+                    <div
+                      className="glass-panel"
+                      style={{
+                        position: 'absolute',
+                        top: '42px',
+                        left: 0,
+                        right: 0,
+                        zIndex: 999,
+                        background: '#FFFFFF',
+                        border: '1px solid var(--border-soft)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-lg)',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        maxHeight: '260px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {exportColumnsOptions.map((col) => {
+                        const checked = selectedExportColumns.includes(col);
+                        return (
+                          <label
+                            key={col}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontWeight: 500,
+                              color: 'var(--text-primary)',
+                              padding: '4px 6px',
+                              borderRadius: '4px',
+                              transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-glow)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                if (checked) {
+                                  setSelectedExportColumns(prev => prev.filter(x => x !== col));
+                                } else {
+                                  setSelectedExportColumns(prev => [...prev, col]);
+                                }
+                              }}
+                              style={{
+                                accentColor: 'var(--primary)',
+                                width: '15px',
+                                height: '15px',
+                                cursor: 'pointer'
+                              }}
+                            />
+                            <span>{col}</span>
+                          </label>
+                        );
+                      })}
+                      <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExportColumns([])}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          Clear All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExportColumnsDropdownOpen(false)}
+                          style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <button className="btn btn-secondary" onClick={handleExportProjectCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Download size={18} />
                 Export Project (CSV)
@@ -1760,6 +1892,46 @@ export default function Projects() {
                           overflowY: 'auto'
                         }}
                       >
+                        {(() => {
+                          const allStatusIds = ['pending', 'assigned', 'reopened', 'in_progress', 'future_release', 'fixed', 'completed', 'closed'];
+                          const allSelected = workItemStatusFilters.length === allStatusIds.length;
+                          return (
+                            <label
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                color: 'var(--text-primary)',
+                                padding: '4px 6px',
+                                borderRadius: '4px',
+                                borderBottom: '1px solid var(--border-soft)',
+                                paddingBottom: '10px',
+                                marginBottom: '4px',
+                                transition: 'background-color 0.15s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-glow)'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={() => {
+                                  setWorkItemStatusFilters(allSelected ? [] : allStatusIds);
+                                }}
+                                style={{
+                                  accentColor: 'var(--primary)',
+                                  width: '15px',
+                                  height: '15px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                              <span>Select All</span>
+                            </label>
+                          );
+                        })()}
                         {[
                           { id: 'pending', label: 'TO DO' },
                           { id: 'assigned', label: 'ASSIGNED' },
@@ -2020,6 +2192,7 @@ export default function Projects() {
                       <tr>
                         <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                         <th>Work</th>
+                        <th>Title</th>
                         <th>Module</th>
                         <th>Assignee</th>
                         <th>Reporter</th>
@@ -2065,14 +2238,6 @@ export default function Projects() {
                                   >
                                     {item.workNumber}
                                   </a>
-                                  <span 
-                                    onClick={() => navigate(`/workitems/${item.id}`)}
-                                    style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-                                  >
-                                    {item.title}
-                                  </span>
                                 </div>
                                 {(renderEpicBadge(item) || renderSeverityBadge(item.severity)) && (
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', paddingLeft: '22px' }}>
@@ -2081,6 +2246,16 @@ export default function Projects() {
                                   </div>
                                 )}
                               </div>
+                            </td>
+                            <td>
+                              <span
+                                onClick={() => navigate(`/workitems/${item.id}`)}
+                                style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                              >
+                                {item.title}
+                              </span>
                             </td>
                             <td>
                               <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>

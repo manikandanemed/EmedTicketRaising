@@ -24,6 +24,7 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Projects = lazy(() => import('./pages/Projects'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
+const MyWorks = lazy(() => import('./pages/MyWorks'));
 const WorkItemDetails = lazy(() => import('./pages/WorkItemDetails'));
 const EmployeeManagement = lazy(() => import('./pages/EmployeeManagement'));
 const BugDetails = lazy(() => import('./pages/BugDetails'));
@@ -71,7 +72,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
     ]
     : [
-      { to: '/', icon: <CheckSquare size={18} />, label: 'My Works', match: (p: string) => p === '/' },
+      { to: '/', icon: <LayoutDashboard size={18} />, label: 'Dashboard', match: (p: string) => p === '/' },
+      { to: '/my-works', icon: <CheckSquare size={18} />, label: 'My Works', match: (p: string) => p.startsWith('/my-works') },
       { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
       { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
     ];
@@ -394,6 +396,7 @@ export const AppContent: React.FC = () => {
               {user?.userType === 'ProductManager' ? <Dashboard /> : <EmployeeDashboard />}
             </ProtectedRoute>
           } />
+          <Route path="/my-works" element={<ProtectedRoute><MyWorks /></ProtectedRoute>} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/workitems/:id" element={<ProtectedRoute><WorkItemDetails /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
