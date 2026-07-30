@@ -14,7 +14,9 @@ import {
   AlertCircle,
   Info,
   X,
-  Menu
+  Menu,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
 import { UserSession, API_BASE_URL, api } from './services/api';
@@ -47,9 +49,25 @@ export const useAuth = () => {
   return context;
 };
 
+// Theme Context
+type Theme = 'light' | 'dark';
+interface ThemeContextType {
+  theme: Theme;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  return context;
+};
+
 // Protected Layout
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, updateUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -205,6 +223,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </span>
             )}
           </div>
+
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label="Toggle color theme"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.25)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.15)';
+            }}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
 
           <button
             onClick={() => { logout(); navigate('/login'); }}
@@ -413,6 +458,23 @@ export const AppContent: React.FC = () => {
 export default function App() {
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem('theme');
+    const initial: Theme = saved === 'light' || saved === 'dark'
+      ? saved
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', initial);
+    return initial;
+  });
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -502,14 +564,16 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        {/* <Router> */}
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          {/* <Router> */}
 
-        <AppContent />
-        {/* </Router> */}
-      </BrowserRouter>
+          <AppContent />
+          {/* </Router> */}
+        </BrowserRouter>
 
-    </AuthContext.Provider>
+      </AuthContext.Provider>
+    </ThemeContext.Provider>
   );
 }

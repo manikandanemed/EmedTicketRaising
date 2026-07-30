@@ -171,7 +171,7 @@ export default function Login() {
       <div style={{
         width: '100%',
         maxWidth: '460px',
-        background: '#FFFFFF',
+        background: 'var(--bg-surface)',
         border: '1px solid var(--border-soft)',
         borderRadius: '24px',
         padding: 'clamp(28px, 6vw, 48px) clamp(20px, 6vw, 44px)',
@@ -551,7 +551,7 @@ export default function Login() {
                         required
                       >
                         {availableRoles.map(role => (
-                          <option key={role} value={role} style={{ color: '#1E293B' }}>
+                          <option key={role} value={role} style={{ color: 'var(--text-primary)', background: 'var(--bg-surface)' }}>
                             {role === 'ProductManager' ? 'Product Manager' : 'Employee'}
                           </option>
                         ))}

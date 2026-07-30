@@ -562,7 +562,7 @@ export default function MyWorks() {
           <h1>My Works</h1>
           <p style={{ color: 'var(--text-muted)' }}>Your assigned tasks and bugs — all in one place.</p>
         </div>
-        <div className="page-header-actions" style={{ display: 'flex', gap: '12px', flexWrap: 'nowrap', alignItems: 'center' }}>
+        <div className="page-header-actions" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="btn btn-primary" onClick={() => { setShowCreateFunctional(true); setCreateAnother(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 600 }}>
             <PlusCircle size={18} />
             Create

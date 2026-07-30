@@ -73,7 +73,7 @@ export default function Register() {
       <div style={{
         width: '100%',
         maxWidth: '480px',
-        background: '#FFFFFF',
+        background: 'var(--bg-surface)',
         border: '1px solid var(--border-soft)',
         borderRadius: '24px',
         padding: 'clamp(28px, 6vw, 48px) clamp(20px, 6vw, 44px)',
