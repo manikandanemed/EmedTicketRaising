@@ -366,7 +366,7 @@ async function requestCsvExport(
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
