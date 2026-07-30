@@ -322,7 +322,7 @@ async function request<T>(
     if (!url.startsWith('/api/auth/')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = `${import.meta.env.BASE_URL}login`;
     }
     throw new Error('Unauthorized');
   }
@@ -332,7 +332,7 @@ async function request<T>(
   if (contentType && contentType.includes('application/json')) {
     try {
       json = await res.json();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   if (!res.ok) {
@@ -435,18 +435,18 @@ export const api = {
 
   getAdminDashboard: (params: { projectId?: number; employeeId?: number; fromDate?: string; toDate?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.projectId)  q.set('projectId',  String(params.projectId));
+    if (params.projectId) q.set('projectId', String(params.projectId));
     if (params.employeeId) q.set('employeeId', String(params.employeeId));
-    if (params.fromDate)   q.set('fromDate',   params.fromDate);
-    if (params.toDate)     q.set('toDate',     params.toDate);
+    if (params.fromDate) q.set('fromDate', params.fromDate);
+    if (params.toDate) q.set('toDate', params.toDate);
     return request<AdminDashboardResponseDto>(`/api/Dashboard/admin?${q}`);
   },
 
   getEmployeeDashboard: (params: { projectId?: number; fromDate?: string; toDate?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.projectId) q.set('projectId', String(params.projectId));
-    if (params.fromDate)  q.set('fromDate',  params.fromDate);
-    if (params.toDate)    q.set('toDate',    params.toDate);
+    if (params.fromDate) q.set('fromDate', params.fromDate);
+    if (params.toDate) q.set('toDate', params.toDate);
     return request<EmployeeDashboardResponseDto>(`/api/Dashboard/employee?${q}`);
   },
 
@@ -456,9 +456,9 @@ export const api = {
   // Paginated + filtered projects
   getAllProjectsPaged: (params: { page?: number; pageSize?: number; search?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.page)     q.set('page',     String(params.page));
+    if (params.page) q.set('page', String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
-    if (params.search)   q.set('search',   params.search);
+    if (params.search) q.set('search', params.search);
     return request<PagedResult<ProjectDto>>(`/api/project/paged?${q}`);
   },
 
@@ -507,12 +507,12 @@ export const api = {
   // Paginated + filtered project work items
   getWorkItemsByProjectPaged: (projectId: number, params: { page?: number; pageSize?: number; status?: string; search?: string; assignedTo?: string; dueDate?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.page)       q.set('page',       String(params.page));
-    if (params.pageSize)   q.set('pageSize',   String(params.pageSize));
-    if (params.status)     q.set('status',     params.status);
-    if (params.search)     q.set('search',     params.search);
+    if (params.page) q.set('page', String(params.page));
+    if (params.pageSize) q.set('pageSize', String(params.pageSize));
+    if (params.status) q.set('status', params.status);
+    if (params.search) q.set('search', params.search);
     if (params.assignedTo) q.set('assignedTo', params.assignedTo);
-    if (params.dueDate)    q.set('dueDate',    params.dueDate);
+    if (params.dueDate) q.set('dueDate', params.dueDate);
     return request<PagedResult<WorkItemDto>>(`/api/project/${projectId}/workitems/paged?${q}`);
   },
 
@@ -520,11 +520,11 @@ export const api = {
   // Paginated + filtered employee work items
   getMyWorkItemsPaged: (params: { page?: number; pageSize?: number; status?: string; dueDate?: string; search?: string; workType?: string; priority?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.page)     q.set('page',     String(params.page));
+    if (params.page) q.set('page', String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
-    if (params.status)   q.set('status',   params.status);
-    if (params.dueDate)  q.set('dueDate',  params.dueDate);
-    if (params.search)   q.set('search',   params.search);
+    if (params.status) q.set('status', params.status);
+    if (params.dueDate) q.set('dueDate', params.dueDate);
+    if (params.search) q.set('search', params.search);
     if (params.workType) q.set('workType', params.workType);
     if (params.priority) q.set('priority', params.priority);
     return request<PagedResult<WorkItemDto>>(`/api/project/workitems/myworks/paged?${q}`);
@@ -585,11 +585,11 @@ export const api = {
 
   getAllBugsPaged: (params: { page?: number; pageSize?: number; status?: string; date?: string; search?: string } = {}) => {
     const q = new URLSearchParams();
-    if (params.page)     q.set('page',     String(params.page));
+    if (params.page) q.set('page', String(params.page));
     if (params.pageSize) q.set('pageSize', String(params.pageSize));
-    if (params.status)   q.set('status',   params.status);
-    if (params.date)     q.set('date',     params.date);
-    if (params.search)   q.set('search',   params.search);
+    if (params.status) q.set('status', params.status);
+    if (params.date) q.set('date', params.date);
+    if (params.search) q.set('search', params.search);
     return request<PagedResult<BugDto>>(`/api/project/workitems/bugs/all/paged?${q}`);
   },
 
