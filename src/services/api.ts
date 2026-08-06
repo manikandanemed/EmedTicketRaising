@@ -442,6 +442,28 @@ export const api = {
     return request<AdminDashboardResponseDto>(`/api/Dashboard/admin?${q}`);
   },
 
+  getAdminWorkItems: (params: { tab?: string; projectId?: number; page?: number; pageSize?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.tab) q.set('tab', params.tab);
+    if (params.projectId) q.set('projectId', String(params.projectId));
+    if (params.page) q.set('page', String(params.page));
+    if (params.pageSize) q.set('pageSize', String(params.pageSize));
+    return request<PagedResult<WorkItemDto>>(`/api/Dashboard/admin/workitems?${q}`);
+  },
+
+  getEmployeeWorkItems: (params: { projectId?: number; page?: number; pageSize?: number; search?: string; status?: string; assignedToUserId?: number; fromDueDate?: string; toDueDate?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.projectId) q.set('projectId', String(params.projectId));
+    if (params.page) q.set('page', String(params.page));
+    if (params.pageSize) q.set('pageSize', String(params.pageSize));
+    if (params.search) q.set('search', params.search);
+    if (params.status) q.set('status', params.status);
+    if (params.assignedToUserId) q.set('assignedToUserId', String(params.assignedToUserId));
+    if (params.fromDueDate) q.set('fromDueDate', params.fromDueDate);
+    if (params.toDueDate) q.set('toDueDate', params.toDueDate);
+    return request<PagedResult<WorkItemDto>>(`/api/Dashboard/employee/workitems?${q}`);
+  },
+
   getEmployeeDashboard: (params: { projectId?: number; fromDate?: string; toDate?: string } = {}) => {
     const q = new URLSearchParams();
     if (params.projectId) q.set('projectId', String(params.projectId));

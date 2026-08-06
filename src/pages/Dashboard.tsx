@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { api, BugDto, AdminDashboardResponseDto, ProjectDto, EmployeeDropdownDto } from '../services/api';
-import { useDebounce } from '../hooks/useDebounce';
+import { api, WorkItemDto, AdminDashboardResponseDto, ProjectDto, EmployeeDropdownDto } from '../services/api';
 import {
   Briefcase, CheckSquare, Bug, Users, Loader2,
   AlertTriangle, RefreshCw, ChevronRight, ChevronLeft,
   ChevronsLeft, ChevronsRight,
-  Search, Filter, X, BarChart3, Clock
+  Filter, X, BarChart3, Clock
 } from 'lucide-react';
 
 // A single-ratio gauge (share of one whole) — deliberately not a 2-slice pie.
@@ -56,16 +55,14 @@ export default function Dashboard() {
   const [filterToDate, setFilterToDate] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
-  // Bugs Queue state (PM)
-  const [pmBugs, setPmBugs] = useState<BugDto[]>([]);
-  const [pmBugsTotalPages, setPmBugsTotalPages] = useState(1);
-  const [pmBugsTotalCount, setPmBugsTotalCount] = useState(0);
-  const [pmBugPage, setPmBugPage] = useState(1);
-  const [pmBugStatus, setPmBugStatus] = useState('all');
-  const [pmBugDate, setPmBugDate] = useState('');
-  const [pmBugSearch, setPmBugSearch] = useState('');
-  const [pmBugsLoading, setPmBugsLoading] = useState(false);
-  const PM_BUG_PAGE_SIZE = 10;
+  // Work Items table state (admin) — All / Open / Closed tabs
+  const [workItemsTab, setWorkItemsTab] = useState<'all' | 'open' | 'closed'>('all');
+  const [adminWorkItems, setAdminWorkItems] = useState<WorkItemDto[]>([]);
+  const [adminWorkItemsTotalPages, setAdminWorkItemsTotalPages] = useState(1);
+  const [adminWorkItemsTotalCount, setAdminWorkItemsTotalCount] = useState(0);
+  const [adminWorkItemsPage, setAdminWorkItemsPage] = useState(1);
+  const [adminWorkItemsLoading, setAdminWorkItemsLoading] = useState(false);
+  const ADMIN_WORKITEMS_PAGE_SIZE = 10;
 
   // Fetch admin dashboard summary (KPIs, status counts, employee breakdown)
   const fetchAdminDashboard = async () => {
@@ -108,41 +105,36 @@ export default function Dashboard() {
 
   const hasActiveFilters = !!(filterProjectId || filterEmployeeId || filterFromDate || filterToDate);
 
-  // Fetch all bugs for PM (paginated + filtered)
-  const fetchPmBugs = async () => {
-    setPmBugsLoading(true);
+  // Fetch admin work items (paginated, tab-filtered)
+  const fetchAdminWorkItems = async () => {
+    setAdminWorkItemsLoading(true);
     try {
-      const res = await api.getAllBugsPaged({
-        page: pmBugPage,
-        pageSize: PM_BUG_PAGE_SIZE,
-        status: pmBugStatus !== 'all' ? pmBugStatus : undefined,
-        date: pmBugDate || undefined,
-        search: pmBugSearch || undefined,
+      const res = await api.getAdminWorkItems({
+        tab: workItemsTab,
+        page: adminWorkItemsPage,
+        pageSize: ADMIN_WORKITEMS_PAGE_SIZE,
       });
       if (res.success) {
-        setPmBugs(res.data.items);
-        setPmBugsTotalPages(res.data.totalPages);
-        setPmBugsTotalCount(res.data.totalCount);
+        setAdminWorkItems(res.data.items);
+        setAdminWorkItemsTotalPages(res.data.totalPages);
+        setAdminWorkItemsTotalCount(res.data.totalCount);
       }
     } catch (err: any) {
-      console.error('Failed to fetch PM bugs:', err);
+      console.error('Failed to fetch admin work items:', err);
     } finally {
-      setPmBugsLoading(false);
+      setAdminWorkItemsLoading(false);
     }
   };
 
-  // Debounce search text so we don't fire an API call on every keystroke
-  const debouncedPmBugSearch = useDebounce(pmBugSearch, 400);
+  // Reset page when the active tab changes
+  useEffect(() => { setAdminWorkItemsPage(1); }, [workItemsTab]);
 
-  // Reset page when PM bug filters change
-  useEffect(() => { setPmBugPage(1); }, [pmBugStatus, pmBugDate, debouncedPmBugSearch]);
-
-  // Re-fetch PM bugs when page/filters change
-  const pmBugsFirstRender = React.useRef(true);
+  // Re-fetch work items when page/tab changes
+  const adminWorkItemsFirstRender = React.useRef(true);
   useEffect(() => {
-    if (pmBugsFirstRender.current) { pmBugsFirstRender.current = false; fetchPmBugs(); return; }
-    fetchPmBugs();
-  }, [pmBugPage, pmBugStatus, pmBugDate, debouncedPmBugSearch]);
+    if (adminWorkItemsFirstRender.current) { adminWorkItemsFirstRender.current = false; fetchAdminWorkItems(); return; }
+    fetchAdminWorkItems();
+  }, [adminWorkItemsPage, workItemsTab]);
 
   if (adminLoading && !adminData) {
     return (
@@ -480,107 +472,82 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ====== PM BUGS QUEUE ====== */}
+      {/* ====== WORK ITEMS (All / Open / Fixed) ====== */}
       <div className="glass-panel" style={{ padding: '28px', marginTop: '28px' }}>
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <Bug size={18} color="var(--danger)" />
-            All Bugs Queue
+            Work Items
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{pmBugsTotalCount} bugs</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{adminWorkItemsTotalCount} items</span>
         </div>
 
-        {/* Filter bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
-            <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Search title or BUG-001..."
-              value={pmBugSearch}
-              onChange={(e) => setPmBugSearch(e.target.value)}
-              style={{ paddingLeft: '12px', height: '38px', fontSize: '0.85rem' }}
-            />
-          </div>
-          <select
-            className="form-select"
-            value={pmBugStatus}
-            onChange={(e) => setPmBugStatus(e.target.value)}
-            style={{ width: '155px', height: '38px', paddingTop: 0, paddingBottom: 0, paddingRight: '30px', paddingLeft: '12px', fontSize: '0.85rem' }}
-          >
-            <option value="all">All Statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="fixed">Fixed</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <input
-              type="date"
-              className="form-input"
-              value={pmBugDate}
-              onChange={(e) => setPmBugDate(e.target.value)}
-              style={{ width: '145px', height: '38px', cursor: 'pointer', padding: '0 8px', fontSize: '0.85rem' }}
-            />
-            {pmBugDate && (
+        {/* Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div className="tabs-container">
+            {(['all', 'open', 'closed'] as const).map(tab => (
               <button
+                key={tab}
                 type="button"
-                onClick={() => setPmBugDate('')}
-                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
+                className={`tab-btn ${workItemsTab === tab ? 'active' : ''}`}
+                onClick={() => setWorkItemsTab(tab)}
               >
-                Clear
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
-            )}
+            ))}
           </div>
-          {pmBugsLoading && <Loader2 size={16} className="spinner" style={{ color: 'var(--primary)' }} />}
+          {adminWorkItemsLoading && <Loader2 size={16} className="spinner" style={{ color: 'var(--primary)' }} />}
         </div>
 
-        {/* Bugs Table */}
-        {pmBugs.length === 0 ? (
+        {/* Work Items Table */}
+        {adminWorkItems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {pmBugsLoading ? 'Loading...' : 'No bugs found matching your filters.'}
+            {adminWorkItemsLoading ? 'Loading...' : 'No work items found.'}
           </div>
         ) : (
           <div className="table-container">
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Bug ID</th>
+                  <th>Work ID</th>
                   <th>Title</th>
-                  <th>Linked Task</th>
+                  <th>Type</th>
+                  <th>Project</th>
                   <th>Raised By</th>
                   <th>Assigned To</th>
                   <th>Status</th>
                   <th>Created</th>
-                  <th>Fixed On</th>
                 </tr>
               </thead>
               <tbody>
-                {pmBugs.map(bug => {
+                {adminWorkItems.map(item => {
                   const statusColors: Record<string, { color: string; bg: string }> = {
-                    open:        { color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
-                    in_progress: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-                    fixed:       { color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-                    resolved:    { color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
-                    closed:      { color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
+                    todo:           { color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
+                    pending:        { color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
+                    assigned:       { color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
+                    open:           { color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+                    reopened:       { color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+                    in_progress:    { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+                    future_release: { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
+                    fixed:          { color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+                    completed:      { color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+                    closed:         { color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
                   };
-                  const sc = statusColors[bug.status] || { color: 'var(--text-muted)', bg: 'transparent' };
+                  const sc = statusColors[item.status] || { color: 'var(--text-muted)', bg: 'transparent' };
                   return (
-                    <tr key={bug.id}>
-                      <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.82rem' }}>{bug.bugNumber}</td>
-                      <td style={{ fontWeight: 600 }}>{bug.title}</td>
-                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{bug.workNumber || '-'}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{bug.raisedBy || '-'}</td>
-                      <td style={{ fontSize: '0.85rem' }}>{bug.assignedTo || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>}</td>
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.82rem' }}>{item.workNumber}</td>
+                      <td style={{ fontWeight: 600 }}>{item.title}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.workType || '-'}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.projectName || '-'}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{item.createdBy || '-'}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{item.assignedTo || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>}</td>
                       <td>
                         <span className="badge" style={{ background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>
-                          {bug.status.replace('_', ' ').toUpperCase()}
+                          {item.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.82rem' }}>{new Date(bug.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                      <td style={{ fontSize: '0.82rem' }}>{bug.fixedAt ? new Date(bug.fixedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</td>
+                      <td style={{ fontSize: '0.82rem' }}>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                     </tr>
                   );
                 })}
@@ -589,23 +556,23 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Bugs Pagination */}
-        {pmBugsTotalCount > 0 && (
+        {/* Pagination */}
+        {adminWorkItemsTotalCount > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginTop: '20px', borderTop: '1px solid var(--border-soft)', paddingTop: '16px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Showing <strong style={{ color: 'var(--text-secondary)' }}>{(pmBugPage - 1) * PM_BUG_PAGE_SIZE + 1}</strong>
+              Showing <strong style={{ color: 'var(--text-secondary)' }}>{(adminWorkItemsPage - 1) * ADMIN_WORKITEMS_PAGE_SIZE + 1}</strong>
               {'–'}
-              <strong style={{ color: 'var(--text-secondary)' }}>{Math.min(pmBugPage * PM_BUG_PAGE_SIZE, pmBugsTotalCount)}</strong>
+              <strong style={{ color: 'var(--text-secondary)' }}>{Math.min(adminWorkItemsPage * ADMIN_WORKITEMS_PAGE_SIZE, adminWorkItemsTotalCount)}</strong>
               {' of '}
-              <strong style={{ color: 'var(--text-secondary)' }}>{pmBugsTotalCount}</strong> bugs
+              <strong style={{ color: 'var(--text-secondary)' }}>{adminWorkItemsTotalCount}</strong> items
             </span>
 
-            {pmBugsTotalPages > 1 && (
+            {adminWorkItemsTotalPages > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setPmBugPage(1)}
-                  disabled={pmBugPage === 1}
+                  onClick={() => setAdminWorkItemsPage(1)}
+                  disabled={adminWorkItemsPage === 1}
                   title="First page"
                   style={{ padding: '6px 8px' }}
                 >
@@ -613,23 +580,23 @@ export default function Dashboard() {
                 </button>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setPmBugPage(prev => Math.max(prev - 1, 1))}
-                  disabled={pmBugPage === 1}
+                  onClick={() => setAdminWorkItemsPage(prev => Math.max(prev - 1, 1))}
+                  disabled={adminWorkItemsPage === 1}
                   style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '0.82rem' }}
                 >
                   <ChevronLeft size={14} />
                   Prev
                 </button>
 
-                {getPageNumbers(pmBugPage, pmBugsTotalPages).map((p, idx) =>
+                {getPageNumbers(adminWorkItemsPage, adminWorkItemsTotalPages).map((p, idx) =>
                   p === 'ellipsis' ? (
                     <span key={`ellipsis-${idx}`} style={{ padding: '0 4px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>&hellip;</span>
                   ) : (
                     <button
                       key={p}
-                      onClick={() => setPmBugPage(p)}
-                      className={p === pmBugPage ? 'btn btn-primary' : 'btn btn-secondary'}
-                      style={{ minWidth: '34px', height: '34px', padding: 0, fontSize: '0.82rem', fontWeight: p === pmBugPage ? 700 : 500 }}
+                      onClick={() => setAdminWorkItemsPage(p)}
+                      className={p === adminWorkItemsPage ? 'btn btn-primary' : 'btn btn-secondary'}
+                      style={{ minWidth: '34px', height: '34px', padding: 0, fontSize: '0.82rem', fontWeight: p === adminWorkItemsPage ? 700 : 500 }}
                     >
                       {p}
                     </button>
@@ -638,8 +605,8 @@ export default function Dashboard() {
 
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setPmBugPage(prev => Math.min(prev + 1, pmBugsTotalPages))}
-                  disabled={pmBugPage === pmBugsTotalPages}
+                  onClick={() => setAdminWorkItemsPage(prev => Math.min(prev + 1, adminWorkItemsTotalPages))}
+                  disabled={adminWorkItemsPage === adminWorkItemsTotalPages}
                   style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '0.82rem' }}
                 >
                   Next
@@ -647,8 +614,8 @@ export default function Dashboard() {
                 </button>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setPmBugPage(pmBugsTotalPages)}
-                  disabled={pmBugPage === pmBugsTotalPages}
+                  onClick={() => setAdminWorkItemsPage(adminWorkItemsTotalPages)}
+                  disabled={adminWorkItemsPage === adminWorkItemsTotalPages}
                   title="Last page"
                   style={{ padding: '6px 8px' }}
                 >

@@ -31,7 +31,9 @@ import {
   ChevronDown,
   RefreshCw,
   PlusCircle,
-  Eye
+  Eye,
+  Pencil,
+  Check
 } from 'lucide-react';
 
 export default function WorkItemDetails() {
@@ -88,6 +90,9 @@ export default function WorkItemDetails() {
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
   const [dueDateInput, setDueDateInput] = useState('');
   const [updatingDueDate, setUpdatingDueDate] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+  const [updatingTitle, setUpdatingTitle] = useState(false);
   const [fixedBill, setFixedBill] = useState('');
   const [raisedBill, setRaisedBill] = useState('');
 
@@ -220,6 +225,25 @@ export default function WorkItemDetails() {
     const generated = `BILL-${workItem.workNumber}`;
     setRaisedBill(generated);
     toast.info('Generated Raised Bill Number: ' + generated);
+  };
+
+  const handleTitleUpdate = async () => {
+    if (!workItem) return;
+    const trimmed = titleInput.trim();
+    if (!trimmed) { toast.error('Title cannot be empty'); return; }
+    setUpdatingTitle(true);
+    try {
+      const res = await api.updateWorkItem(workItem.id, { title: trimmed });
+      if (res.success) {
+        setWorkItem(res.data);
+        setEditingTitle(false);
+        toast.success('Title updated successfully!');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update title');
+    } finally {
+      setUpdatingTitle(false);
+    }
   };
 
   const handleDueDateUpdate = async () => {
@@ -562,7 +586,38 @@ export default function WorkItemDetails() {
               {workItem.labels && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Label: <strong style={{ color: '#f472b6', textTransform: 'capitalize' }}>{workItem.labels}</strong></span>}
             </div>
             
-            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '16px' }}>{workItem.title}</h1>
+            {editingTitle ? (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={titleInput}
+                  autoFocus
+                  disabled={updatingTitle}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTitleUpdate();
+                    if (e.key === 'Escape') setEditingTitle(false);
+                  }}
+                  style={{ flex: 1, minWidth: '260px', fontSize: '1.4rem', fontWeight: 700, padding: '8px 12px' }}
+                />
+                <button className="btn btn-primary" onClick={handleTitleUpdate} disabled={updatingTitle} style={{ padding: '10px 14px' }}>
+                  <Check size={16} />
+                </button>
+                <button className="btn btn-secondary" onClick={() => setEditingTitle(false)} disabled={updatingTitle} style={{ padding: '10px 14px' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <h1
+                style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: isLocked ? 'default' : 'pointer' }}
+                onClick={() => { if (isLocked) return; setTitleInput(workItem.title); setEditingTitle(true); }}
+                title={isLocked ? undefined : 'Click to edit title'}
+              >
+                {workItem.title}
+                {!isLocked && <Pencil size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+              </h1>
+            )}
             <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '20px', whiteSpace: 'pre-wrap' }}>
               {workItem.description || 'No description provided.'}
             </p>
