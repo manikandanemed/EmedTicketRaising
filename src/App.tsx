@@ -84,7 +84,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = isPM
     ? [
       { to: '/', icon: <LayoutDashboard size={18} />, label: 'Dashboard', match: (p: string) => p === '/' },
-      { to: '/projects', icon: <Briefcase size={18} />, label: 'Projects', match: (p: string) => p.startsWith('/projects') },
+      { to: '/products', icon: <Briefcase size={18} />, label: 'Products', match: (p: string) => p.startsWith('/products') || p.startsWith('/projects') },
       { to: '/employees', icon: <Users size={18} />, label: 'Employees', match: (p: string) => p.startsWith('/employees') },
       { to: '/notes', icon: <FileText size={18} />, label: 'My Notes', match: (p: string) => p.startsWith('/notes') },
       { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
@@ -442,6 +442,7 @@ export const AppContent: React.FC = () => {
             </ProtectedRoute>
           } />
           <Route path="/my-works" element={<ProtectedRoute><MyWorks /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
           <Route path="/workitems/:id" element={<ProtectedRoute><WorkItemDetails /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />

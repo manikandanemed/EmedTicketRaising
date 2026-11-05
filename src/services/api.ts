@@ -29,6 +29,18 @@ export interface ClientDto {
   clientNumber: string;
   name: string;
   description?: string;
+  productId?: number | null;
+  productName?: string | null;
+  createdAt: string;
+}
+
+export interface ClientModuleDto {
+  id: number;
+  clientModuleNumber: string;
+  name: string;
+  description?: string;
+  clientId: number;
+  clientName: string;
   createdAt: string;
 }
 
@@ -37,8 +49,8 @@ export interface ProductDto {
   productNumber: string;
   name: string;
   description?: string;
-  projectId: number;
-  projectName: string;
+  projectId?: number | null;
+  projectName?: string;
   createdAt: string;
 }
 
@@ -92,18 +104,21 @@ export interface WorkItemDto {
   labels?: string | null;
   team?: string | null;
   attachmentUrls?: string | null;
-  projectId: number;
-  projectName: string;
-  projectNumber: string;
+  projectId?: number | null;
+  projectName?: string;
+  projectNumber?: string;
   assignedTo?: string;
   createdBy: string;
   createdAt: string;
+  updatedAt?: string | null;
   dueDate?: string | null;
-  moduleId?: number;
+  moduleId?: number | null;
   moduleName?: string;
-  productId?: number;
+  clientModuleId?: number | null;
+  clientModuleName?: string;
+  productId?: number | null;
   productName?: string;
-  clientId?: number;
+  clientId?: number | null;
   clientName?: string;
   epicName?: string | null;
   epicColor?: string | null;
@@ -177,8 +192,16 @@ export interface WorkItemActivityLogDto {
 
 export interface WorkItemStatusCountDto {
   pending: number;
+  assigned?: number;
   inProgress: number;
   completed: number;
+  testingInProgress?: number;
+  bugs?: number;
+  open?: number;
+  fixed?: number;
+  reopen?: number;
+  testingCompleted?: number;
+  released?: number;
   testing: number;
   bugFound: number;
   closed: number;
@@ -258,6 +281,10 @@ export interface AdminStatusCountsDto {
   completed: number;
   closed: number;
   open: number;
+  testingInProgress?: number;
+  bugs?: number;
+  testingCompleted?: number;
+  released?: number;
 }
 
 export interface AdminEmployeeBreakdownDto {
@@ -273,6 +300,10 @@ export interface AdminEmployeeBreakdownDto {
   completed: number;
   closed: number;
   open: number;
+  testingInProgress?: number;
+  bugs?: number;
+  testingCompleted?: number;
+  released?: number;
 }
 
 export interface AdminDashboardResponseDto {
@@ -336,7 +367,7 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    throw new Error(json?.message || `Request failed with status ${res.status}`);
+    throw new Error(json?.message || json?.Message || `Request failed with status ${res.status}`);
   }
 
   if (!json) {
@@ -586,6 +617,26 @@ export const api = {
     });
   },
 
+  updateWorkItemDescription: (workItemId: number, description: string | null) =>
+    request<WorkItemDto>(`/api/project/workitems/${workItemId}/description`, {
+      method: 'PUT',
+      body: JSON.stringify({ description }),
+    }),
+
+  addWorkItemAttachment: (workItemId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<WorkItemDto>(`/api/project/workitems/${workItemId}/attachments`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  deleteWorkItemAttachment: (workItemId: number, fileUrl: string) =>
+    request<WorkItemDto>(`/api/project/workitems/${workItemId}/attachments?fileUrl=${encodeURIComponent(fileUrl)}`, {
+      method: 'DELETE',
+    }),
+
   updateWorkItemDueDate: (workItemId: number, dueDate: string | null) =>
     request<WorkItemDto>(`/api/project/workitems/${workItemId}/duedate`, {
       method: 'PUT',
@@ -647,21 +698,39 @@ export const api = {
     }),
 
   // Hierarchy Management
-  getClients: () =>
-    request<ClientDto[]>('/api/project/clients'),
+  getAllProducts: () =>
+    request<ProductDto[]>('/api/project/products'),
 
-  createClient: (name: string, description?: string) =>
+  getClients: (productId?: number) =>
+    request<ClientDto[]>(productId ? `/api/project/clients?productId=${productId}` : '/api/project/clients'),
+
+  getClientsByProduct: (productId: number) =>
+    request<ClientDto[]>(`/api/project/products/${productId}/clients`),
+
+  createClient: (name: string, description?: string, productId?: number) =>
     request<ClientDto>('/api/project/clients', {
       method: 'POST',
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, productId }),
     }),
 
-  getProducts: (projectId: number) =>
-    request<ProductDto[]>(`/api/project/${projectId}/products`),
+  updateClient: (clientId: number, name: string, description?: string, productId?: number) =>
+    request<ClientDto>(`/api/project/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description, productId }),
+    }),
 
-  createProduct: (name: string, description: string | undefined, projectId: number) =>
+  getProducts: (projectId?: number) =>
+    request<ProductDto[]>(projectId ? `/api/project/${projectId}/products` : '/api/project/products'),
+
+  createProduct: (name: string, description?: string, projectId?: number) =>
     request<ProductDto>('/api/project/products', {
       method: 'POST',
+      body: JSON.stringify({ name, description, projectId }),
+    }),
+
+  updateProduct: (productId: number, name: string, description?: string, projectId?: number) =>
+    request<ProductDto>(`/api/project/products/${productId}`, {
+      method: 'PUT',
       body: JSON.stringify({ name, description, projectId }),
     }),
 
@@ -674,8 +743,72 @@ export const api = {
       body: JSON.stringify({ name, description, productId }),
     }),
 
-  getBuildsByProject: (projectId: number) =>
-    request<SoftwareBuildDto[]>(`/api/project/${projectId}/builds`),
+  updateModule: (moduleId: number, name: string, description: string | undefined, productId: number) =>
+    request<ModuleDto>(`/api/project/modules/${moduleId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description, productId }),
+    }),
+
+  getClientModules: (clientId: number) =>
+    request<ClientModuleDto[]>(`/api/project/clients/${clientId}/modules`),
+
+  createClientModule: (name: string, clientId: number, description?: string) =>
+    request<ClientModuleDto>('/api/project/client-modules', {
+      method: 'POST',
+      body: JSON.stringify({ name, clientId, description }),
+    }),
+
+  updateClientModule: (clientModuleId: number, name: string, clientId: number, description?: string) =>
+    request<ClientModuleDto>(`/api/project/client-modules/${clientModuleId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, clientId, description }),
+    }),
+
+  deleteClientModule: (clientModuleId: number) =>
+    request<string>(`/api/project/client-modules/${clientModuleId}`, {
+      method: 'DELETE',
+    }),
+
+  getWorkItemsByParent: (params: { moduleId?: number; clientModuleId?: number; productId?: number }) => {
+    const q = new URLSearchParams();
+    if (params.moduleId) q.set('moduleId', String(params.moduleId));
+    if (params.clientModuleId) q.set('clientModuleId', String(params.clientModuleId));
+    if (params.productId) q.set('productId', String(params.productId));
+    return request<WorkItemDto[]>(`/api/project/parents/workitems?${q}`);
+  },
+
+  getWorkItemsByParentPaged: (params: {
+    moduleId?: number;
+    clientModuleId?: number;
+    productId?: number;
+    page?: number;
+    pageSize?: number;
+    status?: string;
+    search?: string;
+    assignedTo?: string;
+    dueDate?: string;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.moduleId) q.set('moduleId', String(params.moduleId));
+    if (params.clientModuleId) q.set('clientModuleId', String(params.clientModuleId));
+    if (params.productId) q.set('productId', String(params.productId));
+    if (params.page) q.set('page', String(params.page));
+    if (params.pageSize) q.set('pageSize', String(params.pageSize));
+    if (params.status) q.set('status', params.status);
+    if (params.search) q.set('search', params.search);
+    if (params.assignedTo) q.set('assignedTo', params.assignedTo);
+    if (params.dueDate) q.set('dueDate', params.dueDate);
+    return request<PagedResult<WorkItemDto>>(`/api/project/parents/workitems/paged?${q}`);
+  },
+
+  createWorkItemDirect: (body: any) =>
+    request<WorkItemDto>('/api/project/workitems', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getBuildsByProject: (projectId?: number | null) =>
+    projectId ? request<SoftwareBuildDto[]>(`/api/project/${projectId}/builds`) : Promise.resolve({ success: true, message: '', data: [] as SoftwareBuildDto[] }),
 
   createBuild: (buildNumber: string, projectId: number) =>
     request<SoftwareBuildDto>('/api/project/builds', {
@@ -701,24 +834,6 @@ export const api = {
   deleteModule: (moduleId: number) =>
     request<string>(`/api/project/modules/${moduleId}`, {
       method: 'DELETE',
-    }),
-
-  updateClient: (clientId: number, name: string, description?: string) =>
-    request<ClientDto>(`/api/project/clients/${clientId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name, description }),
-    }),
-
-  updateProduct: (productId: number, name: string, description: string | undefined, projectId: number) =>
-    request<ProductDto>(`/api/project/products/${productId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name, description, projectId }),
-    }),
-
-  updateModule: (moduleId: number, name: string, description: string | undefined, productId: number) =>
-    request<ModuleDto>(`/api/project/modules/${moduleId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name, description, productId }),
     }),
 
   updateBuild: (buildId: number, buildNumber: string, projectId: number, isActive: boolean) =>

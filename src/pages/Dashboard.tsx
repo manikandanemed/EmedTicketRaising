@@ -167,9 +167,8 @@ export default function Dashboard() {
 
   const kpiCards = [
     {
-      label: 'Total Projects',
+      label: 'Total Products',
       value: totalProjects,
-      sub: 'Across the organization',
       icon: <Briefcase size={24} />,
       color: 'var(--primary)',
       glow: 'var(--primary-glow)',
@@ -179,7 +178,6 @@ export default function Dashboard() {
     {
       label: 'Work Items',
       value: totalWorkItems,
-      sub: 'Tracked deliverables',
       icon: <CheckSquare size={24} />,
       color: 'var(--info)',
       glow: 'var(--info-glow)',
@@ -189,7 +187,6 @@ export default function Dashboard() {
     {
       label: 'Total Bugs',
       value: totalBugs,
-      sub: `${statusCounts.fixed} fixed`,
       icon: <Bug size={24} />,
       color: 'var(--danger)',
       glow: 'var(--danger-glow)',
@@ -199,7 +196,6 @@ export default function Dashboard() {
     {
       label: 'Total Employees',
       value: totalEmployees,
-      sub: 'Actively assigned',
       icon: <Users size={24} />,
       color: 'var(--success)',
       glow: 'var(--success-glow)',
@@ -213,26 +209,28 @@ export default function Dashboard() {
   // by eye. "Closed" is deliberately a de-emphasis neutral, not a categorical
   // hue — it reads as archived, not as active data.
   const statusCards = [
-    { label: 'Assigned',       value: statusCounts.assigned,     color: '#1baf7a' },
-    { label: 'Closed',         value: statusCounts.closed,       color: '#94a3b8' },
-    { label: 'Completed',      value: statusCounts.completed,    color: '#008300' },
-    { label: 'Fixed',          value: statusCounts.fixed,        color: '#eda100' },
-    { label: 'Future Release', value: statusCounts.futureRelease, color: '#4a3aa7' },
-    { label: 'In Progress',    value: statusCounts.inProgress,   color: '#eb6834' },
-    { label: 'Open',           value: statusCounts.open,         color: '#e34948' },
-    { label: 'Reopen',         value: statusCounts.reopen,       color: '#e87ba4' },
-    { label: 'To Do',          value: statusCounts.todo,         color: '#2a78d6' },
+    { label: 'Assigned',            value: statusCounts.assigned,             color: '#1baf7a' },
+    { label: 'In-Progress',         value: statusCounts.inProgress,           color: '#eb6834' },
+    { label: 'Completed',           value: statusCounts.completed,            color: '#008300' },
+    { label: 'Testing In-Progress', value: statusCounts.testingInProgress || 0, color: '#0284c7' },
+    { label: 'Bugs',                value: statusCounts.bugs || 0,              color: '#ef4444' },
+    { label: 'Open',                value: statusCounts.open,                 color: '#e34948' },
+    { label: 'Fixed',               value: statusCounts.fixed,                color: '#eda100' },
+    { label: 'Re-Open',             value: statusCounts.reopen,               color: '#e87ba4' },
+    { label: 'Testing Completed',   value: statusCounts.testingCompleted || 0, color: '#10b981' },
+    { label: 'Released',            value: (statusCounts.released || 0) + (statusCounts.closed || 0), color: '#8b5cf6' },
   ];
 
   return (
-    <div className="page-enter">
+    <div className="page-enter dashboard-page">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header dashboard-heading">
         <div>
-          <h1>Dashboard</h1>
-          <p>Project health, workloads and bug metrics.</p>
+          <span className="dashboard-eyebrow">PRODUCT OPERATIONS</span>
+          <h1>Workspace overview</h1>
+          <p>Product health, workloads and bug metrics across your team.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="dashboard-heading-actions">
           {lastUpdatedAt && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               <Clock size={13} />
@@ -247,39 +245,39 @@ export default function Dashboard() {
       </div>
 
       {/* Filters */}
-      <div className="glass-panel" style={{ padding: '18px 20px', marginBottom: '20px', display: 'flex', alignItems: 'flex-end', gap: '18px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 700, paddingBottom: '9px' }}>
+      <div className="glass-panel dashboard-filters">
+        <div className="dashboard-filter-title">
           <Filter size={15} color="var(--primary-hover)" />
           Filters
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Project</label>
+        <div className="dashboard-filter-field">
+          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Product</label>
           <select
             className="form-select"
             value={filterProjectId}
             onChange={(e) => setFilterProjectId(e.target.value)}
-            style={{ width: '210px', height: '38px', fontSize: '0.85rem' }}
+            style={{ height: '38px', fontSize: '0.85rem' }}
           >
-            <option value="">All Projects</option>
+            <option value="">All Products</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="dashboard-filter-field">
           <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Employee</label>
           <select
             className="form-select"
             value={filterEmployeeId}
             onChange={(e) => setFilterEmployeeId(e.target.value)}
-            style={{ width: '210px', height: '38px', fontSize: '0.85rem' }}
+            style={{ height: '38px', fontSize: '0.85rem' }}
           >
             <option value="">All Employees</option>
             {employeesList.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="dashboard-filter-field dashboard-filter-date">
           <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>From Date</label>
           <input
             type="date"
@@ -287,11 +285,11 @@ export default function Dashboard() {
             value={filterFromDate}
             max={filterToDate || undefined}
             onChange={(e) => setFilterFromDate(e.target.value)}
-            style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
+            style={{ height: '38px', fontSize: '0.85rem' }}
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="dashboard-filter-field dashboard-filter-date">
           <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>To Date</label>
           <input
             type="date"
@@ -299,7 +297,7 @@ export default function Dashboard() {
             value={filterToDate}
             min={filterFromDate || undefined}
             onChange={(e) => setFilterToDate(e.target.value)}
-            style={{ width: '160px', height: '38px', fontSize: '0.85rem' }}
+            style={{ height: '38px', fontSize: '0.85rem' }}
           />
         </div>
 
@@ -310,7 +308,7 @@ export default function Dashboard() {
           </button>
         )}
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '9px' }}>
+        <div className="dashboard-filter-feedback">
           {adminLoading && <Loader2 size={16} className="spinner" style={{ color: 'var(--primary)' }} />}
           {adminError && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)', fontSize: '0.8rem' }}>
@@ -352,11 +350,11 @@ export default function Dashboard() {
       )}
 
       {/* KPI Cards */}
-      <div className="dashboard-grid" style={{ marginBottom: '28px' }}>
+      <div className="dashboard-grid dashboard-kpi-grid">
         {kpiCards.map((card, i) => (
           <div
             key={card.label}
-            className="glass-panel stat-card custom-card-highlight"
+            className="glass-panel stat-card custom-card-highlight dashboard-kpi-card"
             style={{
               '--card-accent': card.accent,
               animationDelay: `${i * 0.08}s`
@@ -365,9 +363,6 @@ export default function Dashboard() {
             <div className="stat-info">
               <h3>{card.label}</h3>
               <p style={{ color: card.color }}>{card.value}</p>
-              <div className="stat-trend">
-                <span>{card.sub}</span>
-              </div>
             </div>
             <div className="stat-icon" style={{ background: card.bg, color: card.color, boxShadow: `0 0 20px ${card.glow}` }}>
               {card.icon}
@@ -377,7 +372,7 @@ export default function Dashboard() {
       </div>
 
       {/* Status Counts */}
-      <div className="glass-panel" style={{ padding: '28px', marginBottom: '28px' }}>
+      <div className="glass-panel dashboard-panel">
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <BarChart3 size={18} color="var(--primary-hover)" />
@@ -385,12 +380,12 @@ export default function Dashboard() {
           </div>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalWorkItems + totalBugs} total (work items + bugs)</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+        <div className="dashboard-status-grid">
           {statusCards.map(s => (
             <div
               key={s.label}
-              className="glass-panel"
-              style={{ padding: '16px 18px', borderLeft: `4px solid ${s.color}`, boxShadow: 'var(--shadow-sm)' }}
+              className="dashboard-status-tile"
+              style={{ '--status-color': s.color } as React.CSSProperties}
             >
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                 {s.label}
@@ -402,7 +397,7 @@ export default function Dashboard() {
       </div>
 
       {/* Employee Workload Table */}
-      <div className="glass-panel" style={{ padding: '28px' }}>
+      <div className="glass-panel dashboard-panel">
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <Users size={18} color="var(--secondary)" />
@@ -473,7 +468,7 @@ export default function Dashboard() {
       </div>
 
       {/* ====== WORK ITEMS (All / Open / Fixed) ====== */}
-      <div className="glass-panel" style={{ padding: '28px', marginTop: '28px' }}>
+      <div className="glass-panel dashboard-panel">
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <Bug size={18} color="var(--danger)" />
@@ -512,7 +507,7 @@ export default function Dashboard() {
                   <th>Work ID</th>
                   <th>Title</th>
                   <th>Type</th>
-                  <th>Project</th>
+                  <th>Product / Module</th>
                   <th>Raised By</th>
                   <th>Assigned To</th>
                   <th>Status</th>
@@ -539,7 +534,10 @@ export default function Dashboard() {
                       <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.82rem' }}>{item.workNumber}</td>
                       <td style={{ fontWeight: 600 }}>{item.title}</td>
                       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.workType || '-'}</td>
-                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.projectName || '-'}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {item.productName || item.projectName || '-'}
+                        {item.moduleName ? ` (${item.moduleName})` : ''}
+                      </td>
                       <td style={{ fontSize: '0.85rem' }}>{item.createdBy || '-'}</td>
                       <td style={{ fontSize: '0.85rem' }}>{item.assignedTo || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>}</td>
                       <td>

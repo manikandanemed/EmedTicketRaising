@@ -240,9 +240,9 @@ export default function BugDetails() {
                   <div style={{ fontWeight: 600 }}>{workItem.title}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Project</div>
-                  <div style={{ fontWeight: 600 }}>{workItem.projectName}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{workItem.projectNumber}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Product / Module</div>
+                  <div style={{ fontWeight: 600 }}>{workItem.productName || workItem.projectName}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{workItem.moduleName ? `Module: ${workItem.moduleName}` : (workItem.clientModuleName ? `Client Module: ${workItem.clientModuleName}` : (workItem.clientName ? `Client: ${workItem.clientName}` : ''))}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Task Status</div>

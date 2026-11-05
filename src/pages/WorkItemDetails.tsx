@@ -33,7 +33,11 @@ import {
   PlusCircle,
   Eye,
   Pencil,
-  Check
+  Check,
+  Paperclip,
+  Trash2,
+  Download,
+  FileText
 } from 'lucide-react';
 
 export default function WorkItemDetails() {
@@ -93,6 +97,11 @@ export default function WorkItemDetails() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState('');
   const [updatingTitle, setUpdatingTitle] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descInput, setDescInput] = useState('');
+  const [updatingDesc, setUpdatingDesc] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [deletingAttachment, setDeletingAttachment] = useState(false);
   const [fixedBill, setFixedBill] = useState('');
   const [raisedBill, setRaisedBill] = useState('');
 
@@ -121,6 +130,8 @@ export default function WorkItemDetails() {
       const res = await api.getWorkItemById(workItemId);
       if (res.success) {
         setWorkItem(res.data);
+        setTitleInput(res.data.title || '');
+        setDescInput(res.data.description || '');
         try {
           const buildsRes = await api.getBuildsByProject(res.data.projectId);
           if (buildsRes.success) setProjectBuilds(buildsRes.data);
@@ -246,6 +257,82 @@ export default function WorkItemDetails() {
     }
   };
 
+  const handleDescriptionUpdate = async () => {
+    if (!workItem) return;
+    setUpdatingDesc(true);
+    try {
+      const res = await api.updateWorkItemDescription(workItem.id, descInput.trim() || null);
+      if (res.success) {
+        setWorkItem(res.data);
+        setEditingDesc(false);
+        toast.success('Description updated successfully!');
+        const actRes = await api.getWorkItemActivity(workItem.id);
+        if (actRes.success) setActivityLog(actRes.data);
+      } else {
+        toast.error(res.message || 'Failed to update description');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update description');
+    } finally {
+      setUpdatingDesc(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !workItem) return;
+    setUploadingAttachment(true);
+    try {
+      let updatedItem = workItem;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const res = await api.addWorkItemAttachment(workItem.id, file);
+        if (res.success) {
+          updatedItem = res.data;
+          toast.success(`Attached "${file.name}"`);
+        } else {
+          toast.error(res.message || `Failed to attach ${file.name}`);
+        }
+      }
+      setWorkItem(updatedItem);
+      const actRes = await api.getWorkItemActivity(workItem.id);
+      if (actRes.success) setActivityLog(actRes.data);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload attachment');
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteAttachment = async (fileUrl: string) => {
+    if (!workItem) return;
+    showConfirm(
+      'Remove Attachment',
+      'Are you sure you want to remove this attachment from the ticket?',
+      async () => {
+        setDeletingAttachment(true);
+        try {
+          const res = await api.deleteWorkItemAttachment(workItem.id, fileUrl);
+          if (res.success) {
+            setWorkItem(res.data);
+            toast.success('Attachment removed');
+            const actRes = await api.getWorkItemActivity(workItem.id);
+            if (actRes.success) setActivityLog(actRes.data);
+          } else {
+            toast.error(res.message || 'Failed to remove attachment');
+          }
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to remove attachment');
+        } finally {
+          setDeletingAttachment(false);
+        }
+      },
+      true,
+      'Remove'
+    );
+  };
+
   const handleDueDateUpdate = async () => {
     if (!workItem) return;
     setUpdatingDueDate(true);
@@ -266,7 +353,7 @@ export default function WorkItemDetails() {
     const status = e.target.value;
     if (!workItem) return;
 
-    if (status === 'fixed' || status === 'completed') {
+    if (status === 'fixed' || status === 'completed' || status === 'testing_completed' || status === 'released') {
       setPendingStatusForBuild(status);
       setPendingBugIdForBuild(null);
       setSelectedFixedBuild('');
@@ -578,10 +665,14 @@ export default function WorkItemDetails() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <span className="badge badge-testing" style={{ fontSize: '0.8rem' }}>{workItem.workNumber}</span>
               <span className={`badge badge-${workItem.priority}`}>{workItem.priority}</span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Project: <strong>{workItem.projectName}</strong></span>
-              {workItem.clientName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Client: <strong>{workItem.clientName}</strong></span>}
-              {workItem.productName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Product: <strong>{workItem.productName}</strong></span>}
+              {workItem.productName ? (
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Product: <strong>{workItem.productName}</strong></span>
+              ) : (
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Project: <strong>{workItem.projectName}</strong></span>
+              )}
               {workItem.moduleName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Module: <strong>{workItem.moduleName}</strong></span>}
+              {workItem.clientName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Client: <strong>{workItem.clientName}</strong></span>}
+              {workItem.clientModuleName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Client Module: <strong>{workItem.clientModuleName}</strong></span>}
               {workItem.team && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Team: <strong style={{ color: '#818cf8' }}>{workItem.team}</strong></span>}
               {workItem.labels && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>| Label: <strong style={{ color: '#f472b6', textTransform: 'capitalize' }}>{workItem.labels}</strong></span>}
             </div>
@@ -618,50 +709,206 @@ export default function WorkItemDetails() {
                 {!isLocked && <Pencil size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
               </h1>
             )}
-            <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '20px', whiteSpace: 'pre-wrap' }}>
-              {workItem.description || 'No description provided.'}
-            </p>
+            {/* Description Section */}
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Description
+                </span>
+                {!isLocked && !editingDesc && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => { setDescInput(workItem.description || ''); setEditingDesc(true); }}
+                    style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                    title="Edit Description"
+                  >
+                    <Pencil size={13} /> {workItem.description ? 'Edit Description' : 'Add Description'}
+                  </button>
+                )}
+              </div>
+
+              {editingDesc ? (
+                <div style={{ background: '#FFFFFF', border: '1px solid var(--border-soft)', borderRadius: '8px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <textarea
+                    className="form-textarea"
+                    rows={5}
+                    value={descInput}
+                    disabled={updatingDesc}
+                    onChange={(e) => setDescInput(e.target.value)}
+                    placeholder="Enter ticket description, steps to reproduce, or specifications..."
+                    style={{ width: '100%', fontSize: '0.95rem', lineHeight: 1.6, padding: '10px 12px', resize: 'vertical' }}
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setEditingDesc(false)}
+                      disabled={updatingDesc}
+                      style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleDescriptionUpdate}
+                      disabled={updatingDesc}
+                      style={{ padding: '6px 16px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      {updatingDesc ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                      Save Description
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => { if (!isLocked) { setDescInput(workItem.description || ''); setEditingDesc(true); } }}
+                  style={{
+                    color: workItem.description ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontSize: '1rem',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    background: workItem.description ? 'rgba(0,0,0,0.015)' : 'rgba(0,0,0,0.02)',
+                    border: '1px dashed ' + (workItem.description ? 'transparent' : 'var(--border-soft)'),
+                    cursor: isLocked ? 'default' : 'pointer',
+                    transition: 'border-color 0.2s, background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                  onMouseLeave={(e) => { if (!isLocked) e.currentTarget.style.borderColor = workItem.description ? 'transparent' : 'var(--border-soft)'; }}
+                  title={isLocked ? undefined : 'Click to edit description'}
+                >
+                  {workItem.description ? (
+                    workItem.description
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      <Plus size={15} /> Click here to add a description for this ticket...
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Attachments Section */}
-            {workItem.attachmentUrls && (
-              <div style={{ marginBottom: '24px', background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '10px' }}>
-                  Attachments
+            <div style={{ marginBottom: '24px', background: '#F8FAFC', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Paperclip size={14} /> Attachments
+                  {workItem.attachmentUrls && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                      ({workItem.attachmentUrls.split(',').filter(Boolean).length})
+                    </span>
+                  )}
                 </span>
+                {!isLocked && (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={handleFileUpload}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingAttachment}
+                      style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', background: '#FFFFFF' }}
+                    >
+                      {uploadingAttachment ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" /> Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} /> Attach Documents
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {(!workItem.attachmentUrls || workItem.attachmentUrls.split(',').filter(Boolean).length === 0) ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', fontStyle: 'italic', padding: '6px 0' }}>
+                  No documents attached yet. Click "Attach Documents" to upload files, documents, or logs.
+                </div>
+              ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                   {workItem.attachmentUrls.split(',').filter(Boolean).map((url, idx) => {
                     const fileName = url.substring(url.lastIndexOf('/') + 1);
+                    const isImg = /\.(png|jpe?g|gif|webp|svg)$/i.test(fileName);
+                    const fileHref = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
                     return (
-                      <a
+                      <div
                         key={idx}
-                        href={`${API_BASE_URL}${url}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
-                          background: '#F8FAFC',
+                          background: '#FFFFFF',
                           border: '1px solid var(--border-soft)',
                           borderRadius: '6px',
-                          padding: '8px 12px',
+                          padding: '6px 10px',
                           fontSize: '0.82rem',
-                          color: '#38bdf8',
-                          textDecoration: 'none',
-                          fontWeight: 500,
-                          transition: 'background-color 0.2s'
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          maxWidth: '280px'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#F8FAFC'}
                       >
-                        <span>📎</span>
-                        <span>{fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName}</span>
-                      </a>
+                        <a
+                          href={fileHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: 'var(--primary)',
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                          title={fileName}
+                        >
+                          {isImg ? <FileImage size={15} style={{ flexShrink: 0 }} /> : <Paperclip size={15} style={{ flexShrink: 0 }} />}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{fileName}</span>
+                        </a>
+                        {!isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAttachment(url)}
+                            disabled={deletingAttachment}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--danger)',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: 0.7,
+                              transition: 'opacity 0.2s',
+                              flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                            title="Remove attachment"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', borderTop: '1px solid var(--border-soft)', paddingTop: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -699,13 +946,16 @@ export default function WorkItemDetails() {
                   disabled={updatingStatus || isLocked}
                   style={{ paddingRight: '30px' }}
                 >
-                  <option value="pending">TO DO</option>
                   <option value="assigned">ASSIGNED</option>
-                  <option value="reopened">REOPEN</option>
-                  <option value="in_progress">IN PROGRESS</option>
-                  <option value="future_release">MOVED TO FUTURE RELEASE</option>
+                  <option value="in_progress">IN-PROGRESS</option>
+                  <option value="completed">COMPLETED</option>
+                  <option value="testing_in_progress">TESTING-IN-PROGRESS</option>
+                  <option value="bugs">BUGS</option>
+                  <option value="open">OPEN</option>
                   <option value="fixed">FIXED</option>
-                  <option value="completed">RESOLVED</option>
+                  <option value="reopen">RE-OPEN</option>
+                  <option value="testing_completed">TESTING COMPLETED</option>
+                  <option value="released">RELEASED</option>
                 </select>
                 {updatingStatus && (
                   <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: '10px', top: '14px', color: 'var(--primary)' }} />
@@ -719,7 +969,7 @@ export default function WorkItemDetails() {
               <div style={{ position: 'relative' }}>
                 <select 
                   className="form-select" 
-                  value={workItem.assignedTo ? employees.find(e => e.name === workItem.assignedTo)?.id || '' : ''} 
+                  value={workItem.assignedToUserId ?? (workItem.assignedTo ? employees.find(e => e.name === workItem.assignedTo)?.id || '' : '')} 
                   onChange={handleAssigneeChange}
                   disabled={updatingAssignee || isLocked}
                 >
@@ -1158,9 +1408,9 @@ export default function WorkItemDetails() {
                     <select
                       className="form-select"
                       value={reassignUserId}
-                      onChange={e => setReassignUserId(Number(e.target.value))}
+                      onChange={e => setReassignUserId(e.target.value === '' ? '' : Number(e.target.value))}
                     >
-                      <option value="">-- Select Employee --</option>
+                      <option value="">-- Unassigned --</option>
                       {employees.map(emp => (
                         <option key={emp.id} value={emp.id}>{emp.name} ({emp.email})</option>
                       ))}
@@ -1170,25 +1420,31 @@ export default function WorkItemDetails() {
                     <button className="btn btn-secondary" onClick={() => setShowReassignModal(false)}>Cancel</button>
                     <button
                       className="btn btn-primary"
-                      disabled={!reassignUserId}
+                      disabled={updatingAssignee}
                       onClick={async () => {
-                        if (!workItem || !reassignUserId) return;
+                        if (!workItem) return;
+                        setUpdatingAssignee(true);
                         try {
-                          const res = await api.reassignWorkItem(workItem.id, Number(reassignUserId));
+                          const assignedId = reassignUserId === '' ? null : Number(reassignUserId);
+                          const res = await api.reassignWorkItem(workItem.id, assignedId);
                           if (res.success) {
                             setWorkItem(res.data);
-                            toast.success('Task reassigned successfully!');
+                            toast.success(assignedId === null ? 'Task unassigned successfully!' : 'Task reassigned successfully!');
                             setShowReassignModal(false);
                             // Refresh activity log
                             const actRes = await api.getWorkItemActivity(workItem.id);
                             if (actRes.success) setActivityLog(actRes.data);
+                          } else {
+                            toast.error(res.message || 'Reassign failed');
                           }
                         } catch (err: any) {
                           toast.error(err.message || 'Reassign failed');
+                        } finally {
+                          setUpdatingAssignee(false);
                         }
                       }}
                     >
-                      <User size={16} /> Reassign
+                      <User size={16} /> Save Assignment
                     </button>
                   </div>
                 </div>

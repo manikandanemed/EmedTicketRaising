@@ -14,6 +14,7 @@ import {
   Download,
   Zap,
   PlusCircle,
+  Plus,
   X
 } from 'lucide-react';
 import { api, WorkItemDto, BugDto, API_BASE_URL, ClientDto, ProductDto, ModuleDto, SoftwareBuildDto } from '../services/api';
@@ -110,6 +111,8 @@ export default function MyWorks() {
   const [editTaskFixedBuild, setEditTaskFixedBuild] = useState('');
   const [editTaskSeverity, setEditTaskSeverity] = useState('');
   const [editTaskIssueType, setEditTaskIssueType] = useState('');
+  const [editTaskAttachmentUrls, setEditTaskAttachmentUrls] = useState<string[]>([]);
+  const [uploadingEditFiles, setUploadingEditFiles] = useState(false);
   const [savingEditTask, setSavingEditTask] = useState(false);
   const [editBuildsOptions, setEditBuildsOptions] = useState<{ buildNumber: string }[]>([]);
 
@@ -127,11 +130,33 @@ export default function MyWorks() {
     setEditTaskFixedBuild(item.fixedBuild || '');
     setEditTaskSeverity(item.severity || '3');
     setEditTaskIssueType(item.issueType || 'New');
+    setEditTaskAttachmentUrls(item.attachmentUrls ? item.attachmentUrls.split(',').filter(Boolean) : []);
     try {
       const buildsRes = await api.getBuildsByProject(item.projectId);
       if (buildsRes.success) setEditBuildsOptions(buildsRes.data);
     } catch (_) {}
     setShowEditTask(true);
+  };
+
+  const handleEditTaskAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setUploadingEditFiles(true);
+    try {
+      const urls: string[] = [];
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        const res = await api.uploadAttachment(file);
+        if (res.success) {
+          urls.push(res.data);
+          toast.success(`Attached ${file.name}`);
+        }
+      }
+      setEditTaskAttachmentUrls(prev => [...prev, ...urls]);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload attachments');
+    } finally {
+      setUploadingEditFiles(false);
+    }
   };
 
   const handleSaveEditTask = async (e: React.FormEvent) => {
@@ -157,7 +182,7 @@ export default function MyWorks() {
         parentId: editingWorkItem.parentId || null,
         epicName: editingWorkItem.epicName || null,
         epicColor: editingWorkItem.epicColor || null,
-        attachmentUrls: editingWorkItem.attachmentUrls || null,
+        attachmentUrls: editTaskAttachmentUrls.join(',') || null,
         moduleId: editingWorkItem.moduleId || null,
       });
       if (res.success) {
@@ -663,14 +688,16 @@ export default function MyWorks() {
                 }}
               >
                 {[
-                  { id: 'pending', label: 'TO DO' },
                   { id: 'assigned', label: 'ASSIGNED' },
-                  { id: 'reopened', label: 'REOPEN' },
-                  { id: 'in_progress', label: 'IN PROGRESS' },
-                  { id: 'future_release', label: 'MOVED TO FUTURE' },
-                  { id: 'completed', label: 'RESOLVED' },
-                  { id: 'open', label: 'Open' },
-                  { id: 'fixed', label: 'Fixed' }
+                  { id: 'in_progress', label: 'IN-PROGRESS' },
+                  { id: 'completed', label: 'COMPLETED' },
+                  { id: 'testing_in_progress', label: 'TESTING-IN-PROGRESS' },
+                  { id: 'bugs', label: 'BUGS' },
+                  { id: 'open', label: 'OPEN' },
+                  { id: 'fixed', label: 'FIXED' },
+                  { id: 'reopen', label: 'RE-OPEN' },
+                  { id: 'testing_completed', label: 'TESTING COMPLETED' },
+                  { id: 'released', label: 'RELEASED' }
                 ].map((item) => {
                   const checked = statusFilters.includes(item.id);
                   return (
@@ -832,7 +859,7 @@ export default function MyWorks() {
                     <tr>
                       <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                       <th>Work</th>
-                      <th>Project</th>
+                      <th>Product</th>
                       <th>Module</th>
                       <th>Assignee</th>
                       <th>Reporter</th>
@@ -869,7 +896,7 @@ export default function MyWorks() {
                           </td>
                           <td>
                             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                              {item.projectName || '—'}
+                              {item.productName || item.projectName || '—'}
                             </span>
                           </td>
                           <td>
@@ -918,13 +945,16 @@ export default function MyWorks() {
                                 borderRadius: '4px'
                               }}
                             >
-                              <option value="pending">TO DO</option>
                               <option value="assigned">ASSIGNED</option>
-                              <option value="reopened">REOPEN</option>
-                              <option value="in_progress">IN PROGRESS</option>
-                              <option value="future_release">MOVED TO FUTURE RELEASE</option>
+                              <option value="in_progress">IN-PROGRESS</option>
+                              <option value="completed">COMPLETED</option>
+                              <option value="testing_in_progress">TESTING-IN-PROGRESS</option>
+                              <option value="bugs">BUGS</option>
+                              <option value="open">OPEN</option>
                               <option value="fixed">FIXED</option>
-                              <option value="completed">RESOLVED</option>
+                              <option value="reopen">RE-OPEN</option>
+                              <option value="testing_completed">TESTING COMPLETED</option>
+                              <option value="released">RELEASED</option>
                             </select>
                           </td>
                           <td>
@@ -943,7 +973,7 @@ export default function MyWorks() {
                             </div>
                           </td>
                           <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                          <td>{new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                          <td>{item.updatedAt ? new Date(item.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                           <td>
                             <input
                               type="date"
@@ -1046,7 +1076,7 @@ export default function MyWorks() {
                   <tr>
                     <th style={{ width: '40px' }}><input type="checkbox" disabled /></th>
                     <th>Work</th>
-                    <th>Project</th>
+                    <th>Product</th>
                     <th>Module</th>
                     <th>Current Assignee</th>
                     <th>Reporter</th>
@@ -1082,7 +1112,7 @@ export default function MyWorks() {
                         </td>
                         <td>
                           <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                            {item.projectName || '—'}
+                            {item.productName || item.projectName || '—'}
                           </span>
                         </td>
                         <td>
@@ -1332,10 +1362,9 @@ export default function MyWorks() {
                     }}
                   >
                     {isPM && <option value="Epic">⚡ Epic</option>}
-                    <option value="Task">☑️ Task</option>
                     <option value="Functional Requirements">⚡ Functional Requirements</option>
+                    <option value="Issue">⚠️ Issue</option>
                     <option value="Design Update">⚠️ Design Update</option>
-                    <option value="Bug">🐞 Bug</option>
                   </select>
                 </div>
 
@@ -1596,18 +1625,6 @@ export default function MyWorks() {
 
               {/* Due Date & Start Date Row */}
               <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Due Date */}
-                <div className="form-group">
-                  <label htmlFor="funcDueDate">Due date</label>
-                  <input
-                    id="funcDueDate"
-                    type="date"
-                    className="form-input"
-                    value={functionalDueDate}
-                    onChange={(e) => setFunctionalDueDate(e.target.value)}
-                  />
-                </div>
-
                 {/* Start Date */}
                 <div className="form-group">
                   <label htmlFor="funcStartDate">Start date</label>
@@ -1621,6 +1638,18 @@ export default function MyWorks() {
                   <span style={{ color: 'var(--text-disabled)', fontSize: '0.72rem', marginTop: '4px', display: 'block' }}>
                     Allows the planned start date for a piece of work to be set.
                   </span>
+                </div>
+
+                {/* Due Date */}
+                <div className="form-group">
+                  <label htmlFor="funcDueDate">Due date</label>
+                  <input
+                    id="funcDueDate"
+                    type="date"
+                    className="form-input"
+                    value={functionalDueDate}
+                    onChange={(e) => setFunctionalDueDate(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -2006,6 +2035,43 @@ export default function MyWorks() {
                 )}
               </div>
 
+              {/* Attachments */}
+              <div className="form-group" style={{ marginTop: '10px' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attachments</span>
+                  <label htmlFor="editTaskFileAttachMW" style={{ cursor: 'pointer', color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                    <Plus size={14} /> Attach Documents
+                  </label>
+                  <input
+                    id="editTaskFileAttachMW"
+                    type="file"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleEditTaskAttachmentUpload}
+                  />
+                </label>
+                {uploadingEditFiles && <p style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>Uploading file(s)...</p>}
+                {editTaskAttachmentUrls.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                    {editTaskAttachmentUrls.map((url, idx) => {
+                      const fileName = url.substring(url.lastIndexOf('/') + 1);
+                      return (
+                        <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F1F5F9', border: '1px solid var(--border-soft)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>
+                          <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditTaskAttachmentUrls(prev => prev.filter((_, i) => i !== idx))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Actions */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '4px', paddingTop: '12px', borderTop: '1px solid var(--border-soft)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditTask(false)} disabled={savingEditTask}>Cancel</button>
@@ -2083,13 +2149,22 @@ const renderUserAvatarAndName = (name?: string) => {
 const formatWorkItemStatus = (status: string) => {
   if (!status) return '';
   switch (status.toLowerCase()) {
-    case 'pending': return 'TO DO';
     case 'assigned': return 'ASSIGNED';
-    case 'reopened': return 'REOPEN';
-    case 'in_progress': return 'IN PROGRESS';
+    case 'in_progress': return 'IN-PROGRESS';
+    case 'completed': return 'COMPLETED';
+    case 'testing_in_progress': return 'TESTING-IN-PROGRESS';
+    case 'bugs': return 'BUGS';
+    case 'open': return 'OPEN';
+    case 'fixed': return 'FIXED';
+    case 'reopen':
+    case 'reopened': return 'RE-OPEN';
+    case 'testing_completed': return 'TESTING COMPLETED';
+    case 'released': return 'RELEASED';
+    // Legacy fallbacks
+    case 'pending': return 'ASSIGNED';
     case 'waiting_customer': return 'WAITING FOR CUSTOMER';
-    case 'future_release': return 'MOVED TO FUTURE RELEASE';
-    case 'completed': return 'RESOLVED';
-    default: return status.toUpperCase().replace('_', ' ');
+    case 'future_release': return 'FUTURE RELEASE';
+    case 'closed': return 'RELEASED';
+    default: return status.toUpperCase().replace(/_/g, ' ');
   }
 };

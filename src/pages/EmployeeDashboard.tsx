@@ -196,15 +196,16 @@ export default function EmployeeDashboard() {
   // Same validated categorical palette used on the admin Dashboard's Status
   // Counts panel, so the two dashboards read as one consistent system.
   const statusCards = [
-    { label: 'Assigned',       value: statusCounts.assigned,      color: '#1baf7a' },
-    { label: 'Closed',         value: statusCounts.closed,        color: '#94a3b8' },
-    { label: 'Completed',      value: statusCounts.completed,     color: '#008300' },
-    { label: 'Fixed',          value: statusCounts.fixed,         color: '#eda100' },
-    { label: 'Future Release', value: statusCounts.futureRelease, color: '#4a3aa7' },
-    { label: 'In Progress',    value: statusCounts.inProgress,    color: '#eb6834' },
-    { label: 'Open',           value: statusCounts.open,          color: '#e34948' },
-    { label: 'Reopen',         value: statusCounts.reopen,        color: '#e87ba4' },
-    { label: 'To Do',          value: statusCounts.todo,          color: '#2a78d6' },
+    { label: 'Assigned',            value: statusCounts.assigned,             color: '#1baf7a' },
+    { label: 'In-Progress',         value: statusCounts.inProgress,           color: '#eb6834' },
+    { label: 'Completed',           value: statusCounts.completed,            color: '#008300' },
+    { label: 'Testing In-Progress', value: statusCounts.testingInProgress || 0, color: '#0284c7' },
+    { label: 'Bugs',                value: statusCounts.bugs || 0,              color: '#ef4444' },
+    { label: 'Open',                value: statusCounts.open,                 color: '#e34948' },
+    { label: 'Fixed',               value: statusCounts.fixed,                color: '#eda100' },
+    { label: 'Re-Open',             value: statusCounts.reopen,               color: '#e87ba4' },
+    { label: 'Testing Completed',   value: statusCounts.testingCompleted || 0, color: '#10b981' },
+    { label: 'Released',            value: (statusCounts.released || 0) + (statusCounts.closed || 0), color: '#8b5cf6' },
   ];
 
   return (
@@ -262,16 +263,16 @@ export default function EmployeeDashboard() {
         <div className="section-header" style={{ marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
           <div className="section-title">
             <Briefcase size={18} color="var(--secondary)" />
-            My Projects
+            My Products
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalProjects} projects</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{totalProjects} products</span>
         </div>
 
         {assignedProjects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon"><Briefcase size={28} /></div>
-            <h3>No projects assigned yet.</h3>
-            <p>Projects you're assigned to will appear here.</p>
+            <h3>No products assigned yet.</h3>
+            <p>Products you're assigned to will appear here.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
@@ -375,7 +376,7 @@ export default function EmployeeDashboard() {
                   <th>Work ID</th>
                   <th>Title</th>
                   <th>Client</th>
-                  <th>Project</th>
+                  <th>Product</th>
                   <th>Module</th>
                   <th>Type</th>
                   <th>Issue Type</th>
@@ -440,7 +441,7 @@ export default function EmployeeDashboard() {
                         )}
                       </td>
                       <td style={{ fontSize: '0.82rem' }}>{item.clientName || '-'}</td>
-                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.projectName || '-'}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.productName || item.projectName || '-'}</td>
                       <td style={{ fontSize: '0.82rem' }}>{item.moduleName || '-'}</td>
                       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{item.workType || '-'}</td>
                       <td style={{ fontSize: '0.82rem' }}>{item.issueType || '-'}</td>
