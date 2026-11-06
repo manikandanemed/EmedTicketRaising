@@ -1,5 +1,11 @@
 # Workspace features: spec (v1)
 
+> **Scope change (supersedes the sections below where they differ).** The frontend now includes ONLY the Home dashboard (section 1),
+> Campaign mails (section 2) and the People panel (section 4). Leave & permission (3) and Projects & documents (5) stay in the backend
+> but have no frontend. In the People API "today's leave status" is dropped: every person is always reported as "Working", and a profile
+> has no balances or time off. Two backend features were added: Excel import into campaign drafts, and shared Excel sheets. See
+> "Excel import" and "Shared sheets" at the end of this file.
+
 ## Roles
 - ProductManager (PM) approves campaign mails and leave/permission. A PM cannot approve their own items. A PM's own leave goes to the other PMs.
 - Employee creates campaign mails and applies for leave/permission.
@@ -96,3 +102,12 @@ Triggers:
 
 ## Out of scope for v1
 Multiple recipients per campaign, scheduled sending, document versions, websockets, and new roles.
+
+## Excel import → campaign drafts (backend)
+Formats: A) a prospect workbook (drafts sheet with Organization, Subject line, Email body, joined by "#" to the prospect sheet with Organization and Email...), B) the simple template (Campaign name | Client | Contact person | Client email | Subject | Message).
+Flow: `POST /api/workspace/campaigns/import/preview` (nothing saved) → `POST .../import/commit` with the preview token and the selected rows → drafts. Also `GET .../import/template`, `GET .../imports`, `GET /api/workspace/campaigns?importId=`, and `POST .../bulk/submit` / `bulk/approve` with per-item results.
+Flags: ERROR (import allowed, submit blocked on the server): missing/invalid client email, or a placeholder left (`[Your name]`, `[Title]`, `[Direct phone]`, `[First name]`). WARNING: text contains "autonom", or the same client email + subject already exists.
+Limits: 5 MB, 500 rows.
+
+## Shared sheets (backend)
+A user uploads an .xlsx (max 10 MB) or creates a blank sheet and shares it with chosen users (view or edit). Editors save cells with `PATCH` against a `baseVersion`; if someone else changed one of the same cells since, the answer is 409 with those cells and nothing is applied. The client polls `GET .../version` every 20 seconds. Owner and shared users only; a ProductManager can view any sheet but edits only when shared with edit rights. Values and formulas only: formatting is not kept (`formattingLost`). Notifications: when a sheet is shared with you, and when someone else saves it (at most one per sheet per person every 10 minutes). Bonus: `POST .../sheets/{id}/import-preview` turns a shared sheet into a campaign import preview.
