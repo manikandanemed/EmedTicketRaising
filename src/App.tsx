@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
 import { UserSession, API_BASE_URL, api } from './services/api';
+import { workspaceEnabled, workspaceNavItems, WorkspaceNavbarItems, WorkspaceApp } from './workspace';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -96,6 +97,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       { to: '/reset-password', icon: <User size={18} />, label: 'My Profile', match: (p: string) => p.startsWith('/reset-password') },
     ];
 
+  // workspace (campaign mails, shared sheets, people): only when VITE_FEATURE_WORKSPACE is 'true'
+  const allNavItems = workspaceEnabled ? [...navItems, ...workspaceNavItems] : navItems;
+
   const initials = user.name
     .split(' ')
     .map((n) => n[0])
@@ -144,6 +148,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Right side items */}
         <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {workspaceEnabled && <Suspense fallback={null}><WorkspaceNavbarItems /></Suspense>}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -294,7 +299,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           {/* Navigation */}
           <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <ul className="nav-links">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const isActive = item.match(location.pathname);
                 return (
                   <li key={item.to}>
@@ -449,6 +454,7 @@ export const AppContent: React.FC = () => {
           <Route path="/bugs/:bugId" element={<ProtectedRoute><BugDetails /></ProtectedRoute>} />
           <Route path="/notes" element={<ProtectedRoute><MyNotes /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ProtectedRoute><ResetPassword /></ProtectedRoute>} />
+          {workspaceEnabled && <Route path="/workspace/*" element={<ProtectedRoute><WorkspaceApp /></ProtectedRoute>} />}
         </Routes>
       </Suspense>
       <ToastContainer />

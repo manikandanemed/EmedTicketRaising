@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-      "build": "tsc -b && vite build --base=/ticket-system/",
+    "build": "tsc -b && vite build --base=/ticket-system/",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortune-sheet/react": "^1.0.4",
     "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
