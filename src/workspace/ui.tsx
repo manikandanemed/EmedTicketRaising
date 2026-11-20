@@ -32,6 +32,7 @@ export function initialsOf(name: string): string {
 
 export function roleLabel(role: string): string {
   if (role === 'ProductManager') return 'Product Manager';
+  if (role === 'Marketing' || role === 'MarketingTeam') return 'Marketing Team';
   if (role === 'Both') return 'Employee / Product Manager';
   return role;
 }

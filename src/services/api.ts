@@ -1,5 +1,4 @@
-export const API_BASE_URL = '/ticket-system';
-
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/ticket-system';
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -16,7 +15,7 @@ export interface PagedResult<T> {
 
 export interface UserSession {
   token: string;
-  userType: 'ProductManager' | 'Employee';
+  userType: 'ProductManager' | 'Employee' | 'Marketing';
   name: string;
   userId: number;
   email?: string;
@@ -425,7 +424,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  switchRole: (targetRole: 'ProductManager' | 'Employee') =>
+  switchRole: (targetRole: 'ProductManager' | 'Employee' | 'Marketing') =>
     request<UserSession>('/api/auth/switch-role', {
       method: 'POST',
       body: JSON.stringify({ targetRole }),

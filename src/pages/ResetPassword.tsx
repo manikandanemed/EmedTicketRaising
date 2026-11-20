@@ -321,7 +321,7 @@ export default function ResetPassword() {
           <div style={{ marginBottom: '16px', textAlign: 'center' }}>
             <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 800, color: '#0F172A' }}>{user.name}</h4>
             <span className="badge" style={{ background: '#F0EDFF', color: 'var(--primary)', padding: '4px 12px', borderRadius: '20px', fontWeight: 600, fontSize: '0.8rem' }}>
-              {user.userType === 'ProductManager' ? 'Product Manager' : 'Employee'}
+              {user.userType === 'ProductManager' ? 'Product Manager' : user.userType === 'Marketing' ? 'Marketing Team' : 'Employee'}
             </span>
           </div>
 

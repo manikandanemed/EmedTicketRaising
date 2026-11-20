@@ -14,7 +14,7 @@ export default function Login() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState<'ProductManager' | 'Employee'>('Employee');
+  const [userType, setUserType] = useState<'ProductManager' | 'Employee' | 'Marketing'>('Employee');
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -547,12 +547,12 @@ export default function Login() {
                         className="form-input"
                         style={{ paddingLeft: '42px', color: 'var(--text-primary)', background: 'var(--bg-card)', cursor: 'pointer' }}
                         value={userType}
-                        onChange={e => setUserType(e.target.value as 'ProductManager' | 'Employee')}
+                        onChange={e => setUserType(e.target.value as 'ProductManager' | 'Employee' | 'Marketing')}
                         required
                       >
                         {availableRoles.map(role => (
                           <option key={role} value={role} style={{ color: 'var(--text-primary)', background: 'var(--bg-surface)' }}>
-                            {role === 'ProductManager' ? 'Product Manager' : 'Employee'}
+                            {role === 'ProductManager' ? 'Product Manager' : role === 'Marketing' ? 'Marketing Team' : 'Employee'}
                           </option>
                         ))}
                       </select>
@@ -568,7 +568,7 @@ export default function Login() {
                     gap: '6px'
                   }}>
                     <AlertCircle size={14} style={{ color: 'var(--primary)' }} />
-                    <span>Logging in as <strong>{availableRoles[0] === 'ProductManager' ? 'Product Manager' : 'Employee'}</strong></span>
+                    <span>Logging in as <strong>{availableRoles[0] === 'ProductManager' ? 'Product Manager' : availableRoles[0] === 'Marketing' ? 'Marketing Team' : 'Employee'}</strong></span>
                   </div>
                 ) : null}
 

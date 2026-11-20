@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate, useLocation, BrowserRouter } from 'react-router-dom';
 import {
   LayoutDashboard,
   Briefcase,
@@ -20,7 +20,9 @@ import {
 } from 'lucide-react';
 import { toast, ToastMessage } from './services/toast';
 import { UserSession, API_BASE_URL, api } from './services/api';
-import { workspaceEnabled, workspaceNavItems, WorkspaceNavbarItems, WorkspaceApp } from './workspace';
+import { workspaceEnabled, workspaceNavItems, useProspectNav, WorkspaceNavbarItems, WorkspaceApp } from './workspace';
+import { MarketingApp } from './marketing';
+import { useMarketingNav } from './marketing/nav';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -78,6 +80,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
+  const prospectNav = useProspectNav(user);
+  const marketingNav = useMarketingNav(user);
+
   if (!user) return null;
 
   const isPM = user.userType === 'ProductManager';
@@ -98,7 +103,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     ];
 
   // workspace (campaign mails, shared sheets, people): only when VITE_FEATURE_WORKSPACE is 'true'
-  const allNavItems = workspaceEnabled ? [...navItems, ...workspaceNavItems] : navItems;
+  // Marketing users only see the lead desk (Lead dashboard, Work queue, Work bench)
+  const allNavItems = marketingNav.length
+    ? marketingNav
+    : workspaceEnabled ? [...navItems, ...(isPM ? [] : workspaceNavItems), ...prospectNav] : navItems; // Product Managers: no Home / Campaign mails
 
   const initials = user.name
     .split(' ')
@@ -176,12 +184,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <select
                 value={user.userType}
                 onChange={async (e) => {
-                  const targetRole = e.target.value as 'ProductManager' | 'Employee';
+                  const targetRole = e.target.value as 'ProductManager' | 'Employee' | 'Marketing';
                   try {
                     const res = await api.switchRole(targetRole);
                     if (res.success) {
                       updateUser(res.data);
-                      toast.success(`Switched role to ${targetRole === 'ProductManager' ? 'Product Manager' : 'Employee'}`);
+                      toast.success(`Switched role to ${targetRole === 'ProductManager' ? 'Product Manager' : targetRole === 'Marketing' ? 'Marketing Team' : 'Employee'}`);
                       navigate('/');
                     } else {
                       toast.error('Failed to switch role');
@@ -213,6 +221,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               >
                 <option value="Employee" style={{ color: '#1E293B' }}>Employee</option>
                 <option value="ProductManager" style={{ color: '#1E293B' }}>Product Manager</option>
+                <option value="Marketing" style={{ color: '#1E293B' }}>Marketing Team</option>
               </select>
             ) : (
               <span style={{
@@ -224,7 +233,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 fontWeight: 600,
                 letterSpacing: '0.2px'
               }}>
-                {isPM ? 'Product Manager' : 'Employee'}
+                {isPM ? 'Product Manager' : user.userType === 'Marketing' ? 'Marketing Team' : 'Employee'}
               </span>
             )}
           </div>
@@ -443,7 +452,8 @@ export const AppContent: React.FC = () => {
 
           <Route path="/" element={
             <ProtectedRoute>
-              {user?.userType === 'ProductManager' ? <Dashboard /> : <EmployeeDashboard />}
+              {user?.userType === 'Marketing' ? <Navigate to="/marketing/dashboard" replace />
+                : user?.userType === 'ProductManager' ? <Dashboard /> : <EmployeeDashboard />}
             </ProtectedRoute>
           } />
           <Route path="/my-works" element={<ProtectedRoute><MyWorks /></ProtectedRoute>} />
@@ -454,6 +464,7 @@ export const AppContent: React.FC = () => {
           <Route path="/bugs/:bugId" element={<ProtectedRoute><BugDetails /></ProtectedRoute>} />
           <Route path="/notes" element={<ProtectedRoute><MyNotes /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ProtectedRoute><ResetPassword /></ProtectedRoute>} />
+          <Route path="/marketing/*" element={<ProtectedRoute><MarketingApp /></ProtectedRoute>} />
           {workspaceEnabled && <Route path="/workspace/*" element={<ProtectedRoute><WorkspaceApp /></ProtectedRoute>} />}
         </Routes>
       </Suspense>

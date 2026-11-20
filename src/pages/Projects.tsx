@@ -386,6 +386,41 @@ export default function Projects() {
     }
   };
 
+  // Export the work items of the selected product (honours the current filters) as CSV
+  const handleExportWorkItemsCSV = async () => {
+    if (!selectedProduct) return;
+    if (!selectedProduct.projectId) {
+      toast.error('This product is not linked to a project, so there is nothing to export.');
+      return;
+    }
+    try {
+      const assigneeEmployeeId = workItemAssigneeFilter !== 'all' && workItemAssigneeFilter !== 'unassigned'
+        ? employees.find(e => e.name === workItemAssigneeFilter)?.id
+        : undefined;
+
+      const { blob, filename } = await api.exportAdminCsv({
+        projectId: selectedProduct.projectId,
+        employeeId: assigneeEmployeeId,
+        status: workItemStatusFilters.length > 0 ? workItemStatusFilters.join(',') : undefined,
+        moduleId: structureTab === 'modules' && selectedModuleId !== 'all' ? Number(selectedModuleId) : undefined,
+        clientId: structureTab === 'clients' && selectedClientId !== 'all' ? Number(selectedClientId) : undefined,
+        columns: selectedExportColumns.length > 0 ? selectedExportColumns.join(',') : undefined,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || `teamtrack_${selectedProduct.productNumber}_export.csv`;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err: any) {
+      toast.error('Failed to export CSV: ' + err.message);
+    }
+  };
+
   // Fetch work items under the selected product + structure path
   const fetchWorkItems = async () => {
     if (!selectedProduct) return;
@@ -1759,6 +1794,60 @@ export default function Projects() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Export columns picker */}
+              <div style={{ position: 'relative', width: '170px' }}>
+                <button
+                  type="button"
+                  className="form-select"
+                  onClick={() => setExportColumnsDropdownOpen(!exportColumnsDropdownOpen)}
+                  style={{
+                    width: '170px', textAlign: 'left', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap',
+                    background: '#F8FAFC', border: '1px solid var(--border-soft)', color: 'var(--text-primary)',
+                    height: '38px', padding: '0 30px 0 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '0.9rem'
+                  }}
+                >
+                  {selectedExportColumns.length === 0
+                    ? 'All Columns'
+                    : `${selectedExportColumns.length} Column${selectedExportColumns.length > 1 ? 's' : ''}`}
+                </button>
+
+                {exportColumnsDropdownOpen && (
+                  <>
+                    <div onClick={() => setExportColumnsDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
+                    <div
+                      className="glass-panel"
+                      style={{
+                        position: 'absolute', top: '42px', left: 0, right: 0, zIndex: 999, background: '#FFFFFF',
+                        border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
+                        padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto'
+                      }}
+                    >
+                      {exportColumnsOptions.map((col) => {
+                        const checked = selectedExportColumns.includes(col);
+                        return (
+                          <label key={col} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => setSelectedExportColumns(prev => checked ? prev.filter(x => x !== col) : [...prev, col])}
+                              style={{ accentColor: 'var(--primary)', width: '15px', height: '15px', cursor: 'pointer' }}
+                            />
+                            <span>{col}</span>
+                          </label>
+                        );
+                      })}
+                      <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <button type="button" onClick={() => setSelectedExportColumns([])} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>Clear All</button>
+                        <button type="button" onClick={() => setExportColumnsDropdownOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}>Apply</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <button className="btn btn-secondary" onClick={handleExportWorkItemsCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Download size={16} />
+                Export CSV
+              </button>
               <div className="glass-panel" style={{ display: 'flex', padding: '4px', gap: '4px', borderRadius: 'var(--radius-sm)', background: '#F1F5F9' }}>
                 <button 
                   className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}

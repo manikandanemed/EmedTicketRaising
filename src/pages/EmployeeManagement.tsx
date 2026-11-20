@@ -25,7 +25,7 @@ export default function EmployeeManagement() {
   const [createEmail, setCreateEmail] = useState('');
   const [createMobile, setCreateMobile] = useState('');
   const [createPassword, setCreatePassword] = useState('');
-  const [createRole, setCreateRole] = useState<'Employee' | 'ProductManager' | 'Both'>('Employee');
+  const [createRole, setCreateRole] = useState<'Employee' | 'ProductManager' | 'Marketing' | 'Both'>('Employee');
   const [createSaving, setCreateSaving] = useState(false);
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -240,13 +240,16 @@ export default function EmployeeManagement() {
                       <span style={{
                         padding: '2px 8px', borderRadius: '4px',
                         background: emp.userType === 'Both' ? 'linear-gradient(135deg, rgba(14,165,233,0.15) 0%, rgba(139,92,246,0.15) 100%)' :
-                                    emp.userType === 'ProductManager' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)',
+                                    emp.userType === 'ProductManager' ? 'rgba(139,92,246,0.15)' :
+                                    emp.userType === 'Marketing' ? 'rgba(245,158,11,0.15)' : 'rgba(14,165,233,0.15)',
                         color: emp.userType === 'Both' ? 'var(--accent)' :
-                               emp.userType === 'ProductManager' ? '#a78bfa' : 'var(--primary-hover)',
+                               emp.userType === 'ProductManager' ? '#a78bfa' :
+                               emp.userType === 'Marketing' ? '#f59e0b' : 'var(--primary-hover)',
                         fontSize: '0.68rem', fontWeight: 700, border: '1px solid var(--border-soft)'
                       }}>
                         {emp.userType === 'Both' ? 'Both Roles' :
-                         emp.userType === 'ProductManager' ? 'Product Manager' : 'Employee'}
+                         emp.userType === 'ProductManager' ? 'Product Manager' :
+                         emp.userType === 'Marketing' ? 'Marketing Team' : 'Employee'}
                       </span>
                     )}
                   </div>
@@ -543,12 +546,13 @@ export default function EmployeeManagement() {
                   id="createRole"
                   className="form-input"
                   value={createRole}
-                  onChange={e => setCreateRole(e.target.value as 'Employee' | 'ProductManager' | 'Both')}
+                  onChange={e => setCreateRole(e.target.value as 'Employee' | 'ProductManager' | 'Marketing' | 'Both')}
                   style={{ color: 'var(--text-primary)', background: 'var(--bg-card)', cursor: 'pointer' }}
                   required
                 >
                   <option value="Employee" style={{ color: '#1E293B' }}>Employee</option>
                   <option value="ProductManager" style={{ color: '#1E293B' }}>Product Manager</option>
+                  <option value="Marketing" style={{ color: '#1E293B' }}>Marketing Team</option>
                   <option value="Both" style={{ color: '#1E293B' }}>Both (Employee & Product Manager)</option>
                 </select>
               </div>

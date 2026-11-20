@@ -272,7 +272,7 @@ export function isUnavailable(e: unknown): boolean {
 
 const base = '/api/workspace';
 
-function query(params: Record<string, string | number | boolean | undefined | null>): string {
+export function query(params: Record<string, string | number | boolean | undefined | null>): string {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '' && v !== false) q.set(k, String(v));
@@ -285,7 +285,7 @@ async function data<T>(p: Promise<{ data: T }>): Promise<T> {
   return (await p).data;
 }
 
-async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> {
+export async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers || {});
   const token = localStorage.getItem('token');
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -300,7 +300,7 @@ async function rawFetch(url: string, init: RequestInit = {}): Promise<Response> 
   return res;
 }
 
-async function download(url: string): Promise<{ blob: Blob; filename: string }> {
+export async function download(url: string): Promise<{ blob: Blob; filename: string }> {
   const res = await rawFetch(url);
   if (!res.ok) {
     let message = `Download failed (${res.status})`;

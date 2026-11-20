@@ -4,12 +4,14 @@ import { Bell, ChevronDown, ExternalLink, Search, Users, X } from 'lucide-react'
 import { useDebounce } from '../hooks/useDebounce';
 import { Campaign, NotificationList, PeopleList, PersonProfile, wsApi, describeError } from './workspaceApi';
 import { confirmLeave } from './leaveGuard';
+import { useMe } from './session';
 import { Avatar, EmptyState, ErrorState, Loading, Modal, Tag, formatDateTime, roleLabel, timeAgo, useLoad } from './ui';
 
 const ROLE_TABS: { key: string; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'Employee', label: 'Employees' },
   { key: 'ProductManager', label: 'Product Managers' },
+  { key: 'Marketing', label: 'Marketing Team' },
 ];
 
 interface MailCounts { drafts: number; waiting: number; sent: number }
@@ -285,10 +287,11 @@ const NotificationBell: React.FC = () => {
 };
 
 export default function NavbarItems() {
+  const { isPM } = useMe();
   return (
     <>
       <PeoplePanel />
-      <NotificationBell />
+      {!isPM && <NotificationBell />}
     </>
   );
 }
