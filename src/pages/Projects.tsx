@@ -481,6 +481,25 @@ export default function Projects() {
     fetchExportColumns();
   }, []);
 
+  // Remember the open product so "Go Back" from a work item returns to its work items
+  const restoredProductRef = React.useRef(false);
+  useEffect(() => {
+    if (restoredProductRef.current || allProducts.length === 0) return;
+    restoredProductRef.current = true;
+    try {
+      const savedId = Number(sessionStorage.getItem('selectedProductId'));
+      const saved = savedId ? allProducts.find(p => p.id === savedId) : null;
+      if (saved) loadProductDetails(saved);
+    } catch (_) {}
+  }, [allProducts]);
+
+  useEffect(() => {
+    try {
+      if (selectedProduct) sessionStorage.setItem('selectedProductId', String(selectedProduct.id));
+      else if (restoredProductRef.current) sessionStorage.removeItem('selectedProductId');
+    } catch (_) {}
+  }, [selectedProduct?.id]);
+
   useEffect(() => {
     if (selectedProduct) {
       fetchWorkItems();

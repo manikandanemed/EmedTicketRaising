@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Attachment, HistoryEntry, NO_ACCESS, Temperature, describeError, isForbidden } from './marketingApi';
+import { Attachment, HistoryEntry, ImportedField, NO_ACCESS, Temperature, describeError, isForbidden } from './marketingApi';
 import { fsize, linkify, openAttachment, tempColor, when } from './helpers';
 
 export const Loading: React.FC<{ label?: string }> = ({ label = 'Loading...' }) => (
@@ -80,4 +80,63 @@ export const HistoryItem: React.FC<{ n: HistoryEntry }> = ({ n }) => (
     {n.body && <details><summary>Show message</summary><div className="mk-mailbody">{linkify(n.body)}</div></details>}
     <FileList files={n.attachments ?? []} />
   </li>
+);
+
+const isUrl = (v: string) => /^https?:\/\/\S+$/i.test(v);
+const looksLikeWebsite = (v: string) => /^(www\.)\S+\.\S+$/i.test(v);
+
+/**
+ * Every column of the imported Excel row, rendered from whatever the backend sends (original headers, sheet order),
+ * so new or custom columns show up without code changes. Blank values are hidden and values already shown
+ * elsewhere (`skipValues`) are not repeated.
+ */
+export const ImportedData: React.FC<{ fields?: ImportedField[]; skipValues?: (string | null | undefined)[] }> = ({ fields, skipValues = [] }) => {
+  const skip = new Set(skipValues.map(v => (v ?? '').trim().toLowerCase()).filter(Boolean));
+  const seen = new Set<string>();
+  const rows = (fields ?? []).filter(f => {
+    const value = (f.value ?? '').trim();
+    if (!value || skip.has(value.toLowerCase())) return false;
+    const key = `${f.name}\u0000${value}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (rows.length === 0) return null;
+  return (
+    <section aria-label="Imported Excel data">
+      <h2 style={{ margin: '0 0 8px', fontSize: 15 }}>Imported data</h2>
+      <dl className="mk-facts mk-imported">
+        {rows.map((f, i) => {
+          const v = f.value.trim();
+          const long = v.length > 80 || v.includes('\n');
+          return (
+            <div key={`${f.name}-${i}`} className={long ? 'wide' : undefined}>
+              <dt>{f.name}</dt>
+              <dd>
+                {isUrl(v) ? <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>
+                  : looksLikeWebsite(v) ? <a href={`https://${v}`} target="_blank" rel="noopener noreferrer">{v}</a>
+                  : v}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </section>
+  );
+};
+
+export const Spinner: React.FC = () => <span className="mk-spin" aria-hidden />;
+
+/** A small yes/no confirmation in the same dialog style as the rest of the page. */
+export const ConfirmDlg: React.FC<{
+  label: string; message: React.ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean;
+  onConfirm: () => void; onCancel: () => void;
+}> = ({ label, message, confirmLabel, danger, busy, onConfirm, onCancel }) => (
+  <Dlg label={label} onClose={() => { if (!busy) onCancel(); }}>
+    <div className="mk-dlg-body"><h2 style={{ fontSize: 18, margin: 0 }}>{label}</h2><p style={{ margin: 0 }}>{message}</p></div>
+    <div className="mk-dlg-foot">
+      <button className="mk-btn" onClick={onCancel} disabled={busy}>Cancel</button>
+      <button className={`mk-btn ${danger ? 'danger solid' : 'primary'}`} autoFocus onClick={onConfirm} disabled={busy}>{busy && <Spinner />}{confirmLabel}</button>
+    </div>
+  </Dlg>
 );

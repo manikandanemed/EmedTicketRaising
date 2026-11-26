@@ -353,6 +353,10 @@ export async function request<T>(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = `${import.meta.env.BASE_URL}login`;
+    } else {
+      // Auth endpoints (e.g. login) send a useful reason; surface it.
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.message || 'Unauthorized');
     }
     throw new Error('Unauthorized');
   }

@@ -218,3 +218,24 @@
   .mk .mk-stagebar .seg-bar span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .mk * { transition: none !important; } }
+.mk .mk-imported dd { font-weight: 500; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mk .mk-imported dd a { color: var(--mk-teal); }
+.mk .mk-imported .wide { grid-column: 1 / -1; }
+
+/* Remove / undo / upload history */
+.mk .mk-btn.danger { color: var(--mk-red); border-color: var(--mk-red); background: transparent; }
+.mk .mk-btn.danger:hover { background: var(--mk-red-soft); }
+.mk .mk-btn.danger.solid { background: var(--mk-red); border-color: var(--mk-red); color: #fff; }
+.mk .mk-btn.danger.solid:hover { filter: brightness(.92); background: var(--mk-red); }
+.mk .mk-rowactions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+.mk .mk-rowactions .mk-btn { white-space: nowrap; }
+@keyframes mk-spin { to { transform: rotate(360deg); } }
+.mk .mk-spin { width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: mk-spin .7s linear infinite; }
+.mk .mk-imports { margin-top: 28px; }
+.mk .mk-imports h2 { font-size: 17px; margin: 0 0 2px; }
+.mk .mk-imports .mk-sub { margin: 0 0 12px; }
+.mk .mk-file { display: flex; align-items: center; gap: 8px; font-weight: 600; overflow-wrap: anywhere; }
+.mk .mk-file svg { width: 18px; height: 18px; flex: none; color: var(--mk-teal); }
+.mk .mk-muted-sm { font-size: 12.5px; color: var(--mk-muted); }
+.mk .st-Active { background: var(--mk-teal-soft); color: var(--mk-teal); }
+.mk .st-Done { background: var(--mk-surface-2); color: var(--mk-muted); border: 1px solid var(--mk-line); }

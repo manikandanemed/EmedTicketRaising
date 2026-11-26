@@ -6,7 +6,7 @@ import { useLookups } from './lookupsContext';
 import { refreshCounts } from './counts';
 import AddHistory from './AddHistory';
 import { OPEN_STAGES, ago, isClosed, showError, useLoad } from './helpers';
-import { ErrorBox, HistoryItem, Loading, StagePill } from './ui';
+import { ErrorBox, HistoryItem, ImportedData, Loading, StagePill } from './ui';
 
 type Filter = 'open' | 'closed' | 'all';
 type HistFilter = 'All' | 'Emails' | 'Calls & notes';
@@ -143,6 +143,8 @@ const LeadPanel: React.FC<{ id: string; onChanged: () => void; onReturned: () =>
         <div><dt>Last contact</dt><dd>{lead.lastContactAt ? `${ago(lead.lastContactAt)} ago` : 'Not contacted yet'}</dd></div>
         <div><dt>Email consent</dt><dd>{lead.consent ? 'Yes' : 'No'}</dd></div>
       </dl>
+
+      <ImportedData fields={lead.importedFields} skipValues={[lead.email, lead.phone]} />
 
       <h2><label htmlFor="bd-stage">Status</label></h2>
       <select

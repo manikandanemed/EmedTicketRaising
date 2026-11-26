@@ -38,11 +38,29 @@ export interface HistoryEntry {
 }
 export interface LeadSummary {
   id: string; name: string; title: string; company: string; email: string; phone: string | null;
+  orgPhone: string | null; linkedInUrl: string | null; possibleEmail: string | null; orgEmail: string | null;
   channel: string; campaign: string; interest: string; score: number; temperature: Temperature; stage: Stage;
   closeReason: string | null; consent: boolean; ownerUserId: string | null; ownerName: string | null; isMine: boolean;
   createdAt: string; pickedUpAt: string | null; lastContactAt: string | null; emailsSent: number;
 }
-export interface LeadDetail extends LeadSummary { history: HistoryEntry[] }
+export interface LeadImportResult {
+  importId?: string; fileName: string; totalRows: number; imported: number; skipped: number; duplicates: number; emptyRows: number; issues: string[];
+}
+/** One uploaded Excel file in the upload history. */
+export interface LeadImport {
+  id: string; fileName: string; sizeBytes: number; uploadedByName: string; uploadedAt: string;
+  totalRows: number; imported: number; skipped: number; duplicates: number;
+  remaining: number; undoable: number;
+  undone: boolean; undoneAt: string | null; undoneByName: string | null; canUndo: boolean;
+}
+export interface ImportUndoResult { importId: string; fileName: string; removed: number; kept: number }
+/** One column of the imported Excel row, with its original header. */
+export interface ImportedField { name: string; value: string }
+export interface LeadDetail extends LeadSummary {
+  /** Every Excel column in sheet order; empty/absent for leads not imported from Excel. */
+  importedFields?: ImportedField[];
+  history: HistoryEntry[];
+}
 export interface Dashboard {
   leadsTracked: number; emailsSent: number; waitingInQueue: number; onMyBench: number; replyRate: number;
   byStage: { stage: string; count: number }[];
@@ -84,12 +102,15 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 /** Sends a request and unwraps the ApiResponse<T> envelope. */
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+async function callFull<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   const res = await send(path, init);
   let json: ApiResponse<T> | null = null;
   try { json = await res.json(); } catch { /* handled below */ }
   if (!json || json.success === false) throw new ApiError(res.status, json?.message || 'Empty or invalid response from server');
-  return json.data;
+  return json;
+}
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await callFull<T>(path, init)).data;
 }
 
 const body = (o: unknown): RequestInit => ({ body: JSON.stringify(o) });
@@ -105,6 +126,12 @@ export const mk = {
   lookups: () => call<Lookups>('/lookups'),
   dashboard: () => call<Dashboard>('/dashboard'),
   queue: (q: QueueQuery) => call<LeadSummary[]>(`/leads/queue${queueQueryString(q)}`),
+  importLeads: (file: File) => { const f = new FormData(); f.append('file', file, file.name); return call<LeadImportResult>('/leads/import', { method: 'POST', body: f }); },
+  /** Permanently deletes a lead that is still waiting in the queue. Resolves with the server's message. */
+  removeLead: async (id: string) => (await callFull<LeadSummary>(`/leads/${id}`, { method: 'DELETE' })).message,
+  imports: () => call<LeadImport[]>('/leads/imports'),
+  /** Undoes an upload; resolves with the server's message and the counts. */
+  undoImport: async (id: string) => { const r = await callFull<ImportUndoResult>(`/leads/imports/${id}/undo`, { method: 'POST' }); return { message: r.message, ...r.data }; },
   bench: (status: 'open' | 'closed' | 'all') => call<LeadSummary[]>(`/leads/bench?status=${status}`),
   lead: (id: string) => call<LeadDetail>(`/leads/${id}`),
   pickUp: (id: string) => call<LeadDetail>(`/leads/${id}/pick-up`, { method: 'POST' }),
